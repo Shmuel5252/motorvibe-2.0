@@ -19,13 +19,24 @@ const NAV_ITEMS = [
  * מעטפת הניווט הראשית של האפליקציה.
  * מרנדרת TopNav עליון, מגירת צד, ניווט תחתון למובייל ואזור תוכן מרכזי.
  * @param {Object} props - מאפייני הקומפוננטה.
- * @param {React.ReactNode | ((state: { activeTab: "home" | "routes" | "ride" | "history" | "bike" }) => React.ReactNode)} props.children
- * - תוכן העמוד הפעיל או פונקציית render prop שמקבלת את activeTab.
+ * @param {React.ReactNode | ((state: {
+ * activeTab: "home" | "routes" | "ride" | "history" | "bike",
+ * isRideActive: boolean,
+ * setIsRideActive: (value: boolean) => void,
+ * onNavigate: (tabKey: "home" | "routes" | "ride" | "history" | "bike") => void,
+ * }) => React.ReactNode)} props.children
+ * - תוכן העמוד הפעיל או פונקציית render prop עם מצב ניווט ורכיבה פעילה.
  * @returns {JSX.Element} שלד ניווט מלא עם תמיכה ב־RTL.
  */
 function AppShell({ children }) {
   const [activeTab, setActiveTab] = useState("home");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
+  /*
+   * מצב רכיבה פעילה גלובלי לשכבת ה־UI.
+   * כשהוא פעיל, המסך עובר ל־Fullscreen HUD ומסתיר ניווט עליון/תחתון.
+   */
+  const [isRideActive, setIsRideActive] = useState(false);
 
   /*
    * עדכון לשונית פעילה וסגירת המגירה לאחר בחירה.
@@ -36,36 +47,60 @@ function AppShell({ children }) {
     setIsDrawerOpen(false);
   };
 
+  /*
+   * מעטפת עדכון למצב רכיבה: סוגרת מגירה כדי למנוע חפיפה ב־Fullscreen.
+   * @param {boolean} isActive - האם רכיבה פעילה כרגע.
+   */
+  const handleRideActiveChange = (isActive) => {
+    setIsRideActive(isActive);
+    if (isActive) {
+      setIsDrawerOpen(false);
+    }
+  };
+
   return (
     <div dir="rtl" className="mv-bg">
-      {/* סרגל עליון עם מותג, לשוניות דסקטופ והמבורגר למובייל */}
-      <TopNav
-        items={NAV_ITEMS}
-        activeTab={activeTab}
-        onNavigate={onNavigate}
-        onMenuClick={() => setIsDrawerOpen(true)}
-      />
+      {/* ניווט עליון מוצג רק כשאין רכיבה פעילה */}
+      {!isRideActive && (
+        <TopNav
+          items={NAV_ITEMS}
+          activeTab={activeTab}
+          onNavigate={onNavigate}
+          onMenuClick={() => setIsDrawerOpen(true)}
+        />
+      )}
 
-      {/* מגירת ניווט צדדית עם Overlay למצב מובייל */}
-      <SideDrawer
-        open={isDrawerOpen}
-        items={NAV_ITEMS}
-        activeTab={activeTab}
-        onNavigate={onNavigate}
-        onClose={() => setIsDrawerOpen(false)}
-      />
+      {/* מגירת צד מבוטלת בזמן רכיבה פעילה כדי למנוע הסחות */}
+      {!isRideActive && (
+        <SideDrawer
+          open={isDrawerOpen}
+          items={NAV_ITEMS}
+          activeTab={activeTab}
+          onNavigate={onNavigate}
+          onClose={() => setIsDrawerOpen(false)}
+        />
+      )}
 
       {/* אזור תוכן עם ריווח תחתון כדי למנוע חפיפה עם BottomNav במובייל */}
-      <main className="pb-24 md:pb-8">
-        {typeof children === "function" ? children({ activeTab }) : children}
+      <main className={isRideActive ? "p-0" : "pb-24 md:pb-8"}>
+        {typeof children === "function"
+          ? children({
+              activeTab,
+              isRideActive,
+              setIsRideActive: handleRideActiveChange,
+              onNavigate,
+            })
+          : children}
       </main>
 
-      {/* פס ניווט תחתון למובייל בלבד */}
-      <BottomNav
-        items={NAV_ITEMS}
-        activeTab={activeTab}
-        onNavigate={onNavigate}
-      />
+      {/* פס ניווט תחתון מוסתר בזמן רכיבה פעילה */}
+      {!isRideActive && (
+        <BottomNav
+          items={NAV_ITEMS}
+          activeTab={activeTab}
+          onNavigate={onNavigate}
+        />
+      )}
     </div>
   );
 }
