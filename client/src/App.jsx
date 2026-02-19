@@ -105,6 +105,12 @@ function App() {
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState("הכל");
   const [isHistoryFilterMenuOpen, setIsHistoryFilterMenuOpen] = useState(false);
 
+  /* רכיבה נבחרת לתצוגת פרטי היסטוריה במודל מקומי. */
+  const [selectedHistoryRide, setSelectedHistoryRide] = useState(null);
+
+  /* הערות מקומיות למסך פרטי רכיבה (ללא שמירה לשרת). */
+  const [historyRideNotes, setHistoryRideNotes] = useState("");
+
   /*
    * טקסט חיפוש מקומי למסך היסטוריה (ללא API).
    */
@@ -158,10 +164,9 @@ function App() {
   const bikePhotoInputRef = useRef(null);
 
   /*
-   * Placeholder לנתוני מסלולים.
-   * נקודת הרחבה עתידית: החלפה בנתונים מהשרת + חיפוש/פילטור אמיתי.
+   * נתוני מסלולים מקומיים כולל metadata בסיסי לתצוגת פרטים.
    */
-  const routes = [
+  const [routes, setRoutes] = useState([
     {
       id: "route-1",
       title: "רמת השרון → תל אביב",
@@ -169,6 +174,9 @@ function App() {
       to: "תל אביב",
       distanceKm: 42,
       etaMin: 45,
+      routeType: "עירוני",
+      difficulty: "בינוני",
+      isTwisty: false,
       tags: ["כביש", "לילה", "מהיר"],
     },
     {
@@ -178,6 +186,9 @@ function App() {
       to: "חיפה",
       distanceKm: 96,
       etaMin: 70,
+      routeType: "בין־עירוני",
+      difficulty: "בינוני",
+      isTwisty: false,
       tags: ["כביש", "לילה", "מהיר"],
     },
     {
@@ -187,9 +198,20 @@ function App() {
       to: "בית שמש",
       distanceKm: 38,
       etaMin: 52,
+      routeType: "נוף",
+      difficulty: "קשה",
+      isTwisty: true,
       tags: ["כביש", "לילה", "מהיר"],
     },
-  ];
+  ]);
+
+  /* טופס יצירה מקומי למסלול חדש במסך Routes. */
+  const [newRouteTitle, setNewRouteTitle] = useState("");
+  const [newRouteFrom, setNewRouteFrom] = useState("");
+  const [newRouteTo, setNewRouteTo] = useState("");
+  const [newRouteType, setNewRouteType] = useState("עירוני");
+  const [newRouteDifficulty, setNewRouteDifficulty] = useState("בינוני");
+  const [newRouteIsTwisty, setNewRouteIsTwisty] = useState(false);
 
   const filterChips = ["הכל", "קצר", "בינוני", "ארוך", "שטח"];
 
@@ -247,6 +269,19 @@ function App() {
     }
 
     return "ארוך";
+  };
+
+  /**
+   * מחזיר קושי מעודכן כאשר מסלול מוגדר כמפותל.
+   * @param {"קל"|"בינוני"|"קשה"} difficulty - רמת קושי נוכחית.
+   * @returns {"קל"|"בינוני"|"קשה"} רמת קושי לאחר כלל מפותל.
+   */
+  const getAdjustedDifficultyForTwisty = (difficulty) => {
+    if (difficulty === "קל") {
+      return "בינוני";
+    }
+
+    return difficulty;
   };
 
   /**
@@ -428,7 +463,7 @@ function App() {
 
     return (
       <div className="w-full">
-        <div className="relative h-[420px] w-full sm:h-[520px]">
+        <div className="relative h-[280px] w-full md:h-[360px]">
           <GoogleMap
             center={ISRAEL_DEFAULT_CENTER}
             zoom={ISRAEL_DEFAULT_ZOOM}
@@ -876,6 +911,15 @@ function App() {
     /* נתיב קו להצגה במסך פרטי מסלול. */
     const routePath = getRoutePolylinePath(selectedRoute);
 
+    /* פרטי תצוגה למסלול עם fallback מקומי ללא שינוי מודל נתונים. */
+    const routeStyle =
+      selectedRoute?.routeType ||
+      selectedRoute?.style ||
+      selectedRoute?.routeStyle ||
+      "עירוני";
+    const routeDifficulty = selectedRoute?.difficulty || "בינוני";
+    const routeNote = selectedRoute?.note || "מסלול זורם ומתאים לרכיבה יומית.";
+
     if (routesView === "routeDetails" && selectedRoute) {
       return (
         <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
@@ -886,20 +930,20 @@ function App() {
               onNavigate,
             })}
 
-            {/* כותרת פרטי מסלול + פרטי מקור/יעד */}
+            {/* כותרת: פרטי מסלול עם מקור/יעד */}
             <section>
-              <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
-                פרטי מסלול
-              </h1>
-              <p className="mt-2 text-base text-slate-300 sm:text-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
+                  פרטי מסלול
+                </h1>
+              </div>
+              <p className="mt-2 text-base font-semibold text-slate-200 sm:text-lg">
                 {selectedRoute.title}
               </p>
-              <p className="mt-1 text-sm text-slate-400">
-                {selectedRoute.from} → {selectedRoute.to}
-              </p>
+              <p className="mt-1 text-sm text-slate-400">{selectedRoute.from} → {selectedRoute.to}</p>
             </section>
 
-            {/* כרטיס מפה גדול עם Polyline או הודעת fallback ללא מפתח */}
+            {/* בלוק מפה: תצוגת מסלול קומפקטית ורספונסיבית */}
             <section className="mt-6">
               <div className="mv-card overflow-hidden rounded-2xl border border-white/10">
                 <RouteDetailsMap
@@ -912,11 +956,66 @@ function App() {
               </div>
             </section>
 
-            {/* חזרה לרשימת המסלולים ללא שינוי המסלול הנבחר */}
-            <section className="mt-4">
-              <Button variant="ghost" size="md" onClick={goToRoutesListView}>
-                חזרה למסלולים
-              </Button>
+            {/* סטטיסטיקות: שלושה אריחים מרכזיים בסגנון מקצועי */}
+            <section className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="mv-card rounded-xl px-3 py-3 text-center">
+                <p className="text-xl font-semibold leading-none text-white sm:text-2xl">
+                  {selectedRoute.distanceKm} ק״מ
+                </p>
+                <p className="mt-1 text-xs text-slate-400">מרחק</p>
+              </div>
+              <div className="mv-card rounded-xl px-3 py-3 text-center">
+                <p className="text-xl font-semibold leading-none text-white sm:text-2xl">
+                  {selectedRoute.etaMin} דק׳
+                </p>
+                <p className="mt-1 text-xs text-slate-400">זמן משוער</p>
+              </div>
+              <div className="mv-card rounded-xl px-3 py-3 text-center">
+                <p className="text-xl font-semibold leading-none text-white sm:text-2xl">
+                  {routeStyle}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">סוג</p>
+              </div>
+            </section>
+
+            {/* תגיות metadata: קושי + מפותל מתחת לגריד הסטטיסטיקות */}
+            <section className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="mv-pill px-3 py-1 text-xs text-emerald-200">
+                קושי: {routeDifficulty}
+              </span>
+              {selectedRoute?.isTwisty && (
+                <span className="mv-pill px-3 py-1 text-xs text-amber-200">
+                  מפותל
+                </span>
+              )}
+            </section>
+
+            {/* הערות: כרטיס ייעודי עם טקסט מסלול */}
+            <section className="mt-6">
+              <GlassCard title="הערות">
+                <p className="text-sm text-slate-300">{routeNote}</p>
+              </GlassCard>
+            </section>
+
+            {/* פעולות: התחלת רכיבה או חזרה לרשימת המסלולים */}
+            <section className="mt-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    setIsRidePaused(false);
+                    setIsRideMinimized(false);
+                    setIsRideActive(true);
+                    onNavigate("ride", { source: "routeStart" });
+                  }}
+                >
+                  התחל
+                </Button>
+                <Button variant="ghost" size="md" onClick={goToRoutesListView}>
+                  חזרה למסלולים
+                </Button>
+              </div>
             </section>
           </main>
         </div>
@@ -940,6 +1039,126 @@ function App() {
             <p className="mt-2 text-base text-slate-300 sm:text-lg">
               בחר מסלול וצא לרכיבה
             </p>
+
+            {/* יצירת מסלול: סוג/קושי/מפותל עם התאמת קושי דטרמיניסטית */}
+            <div className="mv-card mt-4 rounded-2xl p-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <input
+                  type="text"
+                  value={newRouteTitle}
+                  onChange={(event) => setNewRouteTitle(event.target.value)}
+                  placeholder="שם מסלול"
+                  className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                />
+                <input
+                  type="text"
+                  value={newRouteFrom}
+                  onChange={(event) => setNewRouteFrom(event.target.value)}
+                  placeholder="מוצא"
+                  className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                />
+                <input
+                  type="text"
+                  value={newRouteTo}
+                  onChange={(event) => setNewRouteTo(event.target.value)}
+                  placeholder="יעד"
+                  className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                />
+              </div>
+
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {/* בחירת סוג מסלול */}
+                <label className="flex flex-col gap-1 text-xs text-slate-300">
+                  <span>סוג מסלול</span>
+                  <select
+                    value={newRouteType}
+                    onChange={(event) => setNewRouteType(event.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  >
+                    <option value="עירוני">עירוני</option>
+                    <option value="בין־עירוני">בין־עירוני</option>
+                    <option value="שטח">שטח</option>
+                    <option value="נוף">נוף</option>
+                  </select>
+                </label>
+
+                {/* בחירת רמת קושי */}
+                <label className="flex flex-col gap-1 text-xs text-slate-300">
+                  <span>רמת קושי</span>
+                  <select
+                    value={newRouteDifficulty}
+                    onChange={(event) => setNewRouteDifficulty(event.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  >
+                    <option value="קל">קל</option>
+                    <option value="בינוני">בינוני</option>
+                    <option value="קשה">קשה</option>
+                  </select>
+                </label>
+
+                {/* בחירת כביש מפותל עם התאמת קושי ל"קל" בלבד */}
+                <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={newRouteIsTwisty}
+                    onChange={(event) => {
+                      const isChecked = event.target.checked;
+                      setNewRouteIsTwisty(isChecked);
+                      if (isChecked) {
+                        setNewRouteDifficulty((prev) =>
+                          getAdjustedDifficultyForTwisty(prev),
+                        );
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-white/20 bg-slate-900/60 text-emerald-400 focus:ring-emerald-300"
+                  />
+                  כביש מפותל
+                </label>
+              </div>
+
+              <div className="mt-3 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    const title = newRouteTitle.trim();
+                    const from = newRouteFrom.trim();
+                    const to = newRouteTo.trim();
+
+                    if (!title || !from || !to) {
+                      return;
+                    }
+
+                    setRoutes((prev) => [
+                      {
+                        id: `route-${Date.now()}`,
+                        title,
+                        from,
+                        to,
+                        distanceKm: 28,
+                        etaMin: 35,
+                        routeType: newRouteType,
+                        difficulty: newRouteIsTwisty
+                          ? getAdjustedDifficultyForTwisty(newRouteDifficulty)
+                          : newRouteDifficulty,
+                        isTwisty: newRouteIsTwisty,
+                        tags: ["כביש", "מקומי"],
+                      },
+                      ...prev,
+                    ]);
+
+                    setNewRouteTitle("");
+                    setNewRouteFrom("");
+                    setNewRouteTo("");
+                    setNewRouteType("עירוני");
+                    setNewRouteDifficulty("בינוני");
+                    setNewRouteIsTwisty(false);
+                  }}
+                >
+                  הוסף מסלול
+                </Button>
+              </div>
+            </div>
 
             {/* שורת חיפוש + סינון בסגנון History */}
             <div className="mt-4 flex items-center gap-2">
@@ -1034,6 +1253,20 @@ function App() {
                     <h3 className="text-base font-semibold text-slate-100">
                       {route.title}
                     </h3>
+                    {/* תגיות metadata בכרטיס מסלול: סוג/קושי/מפותל */}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="mv-pill px-2.5 py-1 text-[11px] text-slate-200">
+                        {route.routeType || "עירוני"}
+                      </span>
+                      <span className="mv-pill px-2.5 py-1 text-[11px] text-emerald-200">
+                        {route.difficulty || "בינוני"}
+                      </span>
+                      {route.isTwisty && (
+                        <span className="mv-pill px-2.5 py-1 text-[11px] text-amber-200">
+                          מפותל
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 text-sm text-slate-400">
                       {route.from} → {route.to}
                     </p>
@@ -1401,6 +1634,7 @@ function App() {
                     variant="ghost"
                     size="md"
                     className="h-8 w-8 rounded-full p-0 text-base"
+                    onClick={() => setSelectedHistoryRide(ride)}
                   >
                     &gt;
                   </Button>
@@ -1430,6 +1664,90 @@ function App() {
               כמו "אין רכיבות להצגה" וכפתור CTA להתחלת רכיבה חדשה.
             */}
           </section>
+
+          {/* מודל פרטי רכיבה: שכבה קבועה עם סגירה בלחיצה על הרקע */}
+          {selectedHistoryRide && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+              <button
+                type="button"
+                className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+                onClick={() => setSelectedHistoryRide(null)}
+                aria-label="סגור פרטי רכיבה"
+              />
+
+              {/* תוכן המודל: פרטים בסיסיים ופעולות */}
+              <div className="relative z-10 w-full max-w-md">
+                <GlassCard title="פרטי רכיבה">
+                  {/* כותרת קומפקטית: שם רכיבה + תאריך */}
+                  <div className="mb-4 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-100">
+                      {selectedHistoryRide.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {selectedHistoryRide.date}
+                    </p>
+                  </div>
+
+                  {/* גריד סטטיסטיקות מקצועי לשלושת המדדים המרכזיים */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="mv-card rounded-xl px-2 py-2 text-center">
+                      <p className="text-[11px] text-slate-400">משך</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-100">
+                        {selectedHistoryRide.duration}
+                      </p>
+                    </div>
+                    <div className="mv-card rounded-xl px-2 py-2 text-center">
+                      <p className="text-[11px] text-slate-400">מרחק</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-100">
+                        {selectedHistoryRide.distance}
+                      </p>
+                    </div>
+                    <div className="mv-card rounded-xl px-2 py-2 text-center">
+                      <p className="text-[11px] text-slate-400">תאריך</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-100">
+                        {selectedHistoryRide.date}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* סיכום רכיבה: שדות placeholder עד חיבור לנתונים אמיתיים */}
+                  <div className="mv-card mt-4 rounded-xl px-3 py-3">
+                    <p className="text-sm font-semibold text-slate-100">סיכום רכיבה</p>
+                    <div className="mt-2 space-y-1.5 text-sm text-slate-300">
+                      <p>מהירות ממוצעת: —</p>
+                      <p>דופק ממוצע: —</p>
+                      <p>מזג אוויר: —</p>
+                    </div>
+                  </div>
+
+                  {/* הערות מקומיות: טקסט חופשי ללא שמירה בשרת */}
+                  <div className="mv-card mt-4 rounded-xl px-3 py-3">
+                    <p className="text-sm font-semibold text-slate-100">הערות</p>
+                    <textarea
+                      value={historyRideNotes}
+                      onChange={(event) => setHistoryRideNotes(event.target.value)}
+                      placeholder="הוסף הערה קצרה על הרכיבה..."
+                      className="mt-2 h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    />
+                  </div>
+
+                  {/* שורת פעולות תחתונה: placeholder לשמירה וחזרה להיסטוריה */}
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <Button variant="primary" size="md" onClick={() => {}}>
+                      שמור כמסלול
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      onClick={() => setSelectedHistoryRide(null)}
+                    >
+                      חזרה להיסטוריה
+                    </Button>
+                  </div>
+                </GlassCard>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     );
