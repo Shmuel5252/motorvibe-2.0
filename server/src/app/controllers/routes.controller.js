@@ -1,0 +1,165 @@
+const { validationResult } = require('express-validator');
+const mongoose = require('mongoose');
+const Route = require('../models/Route');
+const { computeDirections } = require('../services/directions.service');
+
+function sendValidation(res, errors) {
+    return res.status(400).json({
+        error: { code: "VALIDATION_ERROR", details: errors.array() }
+    });
+}
+
+async function createRoute(req, res) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return sendValidation(res, errors);
+    }
+
+    const owner = req.user.userId;
+    const { title, start, end } = req.body;
+
+    let dir;
+    try {
+        dir = await computeDirections(start, end);
+    } catch (err) {
+        return res.status(502).json({
+            error: {
+                code: "DIRECTIONS_FAILED",
+                message: err.message||"Failed to compute directions",
+                googleStatus: err.googleStatus,
+                googleErrorMessage: err.googleErrorMessage,
+            },
+        });
+    }
+
+    const { distanceKm, etaMinutes, polyline } = dir;
+
+    const route = await Route.create({
+        owner,
+        title,
+        start,
+        end,
+        visibility: 'private',
+        distanceKm,
+        etaMinutes,
+        polyline
+    });
+
+    return res.status(201).json({ route });
+}
+
+async function listMyRoutes(req, res) {
+    const owner = req.user.userId;
+
+    const routes = await Route.find({ owner }).sort({ createdAt: -1 });
+
+    return res.status(200).json({ routes });
+}
+
+async function getMyRoute(req, res) {
+    const owner = req.user.userId;
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+
+    const route = await Route.findOne({ _id: id, owner });
+    if (!route) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+
+    return res.status(200).json({ route });
+}
+
+async function updateMyRoute(req, res) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return sendValidation(res, errors);
+    }
+    const owner = req.user.userId;
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+
+    const update = {};
+    const fields = ['title', 'start', 'end'];
+    for (const key of fields) {
+        if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+
+    const startChanged = req.body.start !== undefined;
+    const endChanged = req.body.end !== undefined;
+    if (startChanged || endChanged) {
+        const existing = await Route.findOne({ _id: id, owner });
+        if (!existing) {
+            return res.status(404).json({   
+                error: { code: "NOT_FOUND", message: "Route not found" }
+            });
+        }
+
+        const finalStart = startChanged ? req.body.start : existing.start;
+        const finalEnd = endChanged ? req.body.end : existing.end;
+        let dir;
+        try {
+            dir = await computeDirections(finalStart, finalEnd);
+        } catch (err) {
+            return res.status(502).json({
+                error: {    
+                    code: "DIRECTIONS_FAILED",
+                    message: err.message||"Failed to compute directions",
+                    googleStatus: err.googleStatus, 
+                    googleErrorMessage: err.googleErrorMessage,
+                },
+            });
+        }
+        update.distanceKm = dir.distanceKm;
+        update.etaMinutes = dir.etaMinutes;
+        update.polyline = dir.polyline;
+    }   
+  
+    const route = await Route.findOneAndUpdate({ _id: id, owner }, update, { new: true });
+    if (!route) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+
+    return res.status(200).json({ route });
+}
+
+async function deleteMyRoute(req, res) {
+    const owner = req.user.userId;
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+    const result = await Route.deleteOne({ _id: id, owner });
+    if (result.deletedCount === 0) {
+        return res.status(404).json({
+            error: { code: "NOT_FOUND", message: "Route not found" }
+        });
+    }
+
+    return res.status(204).send();
+}
+
+
+module.exports = {
+    createRoute,
+    listMyRoutes,
+    getMyRoute,
+    updateMyRoute,
+    deleteMyRoute
+};
