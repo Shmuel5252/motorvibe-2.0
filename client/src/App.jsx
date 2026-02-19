@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Button from "./app/ui/components/Button";
 import GlassCard from "./app/ui/components/GlassCard";
 import AppShell from "./app/layouts/AppShell";
@@ -57,11 +57,16 @@ function App() {
    * באנר רכיבה פעילה לטאבים שאינם רכיבה.
    * @param {Object} params - מאפייני הבאנר.
    * @param {boolean} params.isRideActive - האם רכיבה פעילה כרגע.
+   * @param {boolean} params.isRideMinimized - האם הרכיבה כרגע במצב מזעור.
    * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - ניווט בין טאבים.
    * @returns {JSX.Element | null} באנר חזרה לרכיבה או null.
    */
-  const renderActiveRideBanner = ({ isRideActive, onNavigate }) => {
-    if (!isRideActive) {
+  const renderActiveRideBanner = ({
+    isRideActive,
+    isRideMinimized,
+    onNavigate,
+  }) => {
+    if (!isRideActive || isRideMinimized) {
       return null;
     }
 
@@ -77,79 +82,122 @@ function App() {
 
   /**
    * שכבת HUD לרכיבה פעילה במסך מלא.
-   * כוללת טיימר דמו (setInterval), נתוני סטטוס ופעולות שליטה תחתונות.
+   * כוללת טיימר גלובלי, נתוני סטטוס ופעולות שליטה תחתונות.
    * @param {Object} props - מאפייני הקומפוננטה.
+   * @param {number} props.rideElapsedSeconds - זמן רכיבה מצטבר בשניות.
+   * @param {boolean} props.isRidePaused - האם הרכיבה במצב השהיה.
+   * @param {(value: boolean) => void} props.setIsRidePaused - עדכון מצב השהיה.
+   * @param {() => void} props.onMinimize - מזעור HUD וחזרה למעטפת רגילה.
    * @param {() => void} props.onFinish - סיום רכיבה פעילה וחזרה למצב רגיל.
    * @returns {JSX.Element} מסך רכיבה פעילה Fullscreen.
    */
-  function RideActiveHud({ onFinish }) {
-    const [elapsedSeconds, setElapsedSeconds] = useState(1);
-    const [isPaused, setIsPaused] = useState(false);
-
-    useEffect(() => {
-      if (isPaused) {
-        return undefined;
-      }
-
-      const intervalId = window.setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-
-      return () => window.clearInterval(intervalId);
-    }, [isPaused]);
-
-    const hours = String(Math.floor(elapsedSeconds / 3600)).padStart(2, "0");
-    const minutes = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, "0");
-    const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+  function RideActiveHud({
+    rideElapsedSeconds,
+    isRidePaused,
+    setIsRidePaused,
+    onMinimize,
+    onFinish,
+  }) {
+    const hours = String(Math.floor(rideElapsedSeconds / 3600)).padStart(
+      2,
+      "0",
+    );
+    const minutes = String(
+      Math.floor((rideElapsedSeconds % 3600) / 60),
+    ).padStart(2, "0");
+    const seconds = String(rideElapsedSeconds % 60).padStart(2, "0");
 
     return (
       <section className="relative min-h-screen overflow-hidden px-4 pb-6 pt-6 sm:px-6">
         {/* שכבת רקע קולנועית + גריד עדין לדימוי מפה */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(20,184,166,0.22),rgba(2,6,23,0.9)_38%,rgba(2,6,23,1)_78%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[26px_26px] opacity-35" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_78%,rgba(16,185,129,0.14),transparent_52%)]" />
 
         <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col justify-between">
           {/* טיימר מרכזי */}
-          <div className="pt-16 text-center sm:pt-20">
+          <div className="pt-10 text-center sm:pt-14">
+            {/* פעולת מזעור: מחזירה למעטפת רגילה בלי לסיים רכיבה */}
+            <div className="mb-5 flex items-center justify-end">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={onMinimize}
+                className="rounded-full px-3 py-1.5 text-xs text-slate-200"
+              >
+                מזער
+              </Button>
+            </div>
+
             <p className="text-6xl font-bold tracking-wider text-white sm:text-7xl">
               {hours}:{minutes}:{seconds}
             </p>
           </div>
 
-          {/* שורת נתונים בזמן אמת (דמו) */}
-          <div className="mv-card mx-auto mt-8 w-full max-w-3xl px-4 py-3">
-            <div className="grid grid-cols-1 gap-2 text-center text-sm text-slate-200 sm:grid-cols-3">
-              <span>דיוק 82%</span>
-              <span>מהירות 84 קמ״ש</span>
-              <span>מרחק 12.4 ק״מ</span>
+          {/* KPI צף בסגנון נקי: 3 עמודות עם אייקון, ערך גדול ותווית קטנה */}
+          <div className="mx-auto mt-8 w-full max-w-3xl border-y border-white/10 py-5">
+            {/* סדר עמודות לוגי: דיוק → מהירות → מרחק */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+                  🧭
+                </span>
+                <span className="text-2xl font-semibold leading-none text-white">
+                  82%
+                </span>
+                <span className="text-xs text-slate-400">דיוק</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+                  ⏱️
+                </span>
+                <span className="text-2xl font-semibold leading-none text-white">
+                  84
+                </span>
+                <span className="text-xs text-slate-400">מהירות (קמ״ש)</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+                  📍
+                </span>
+                <span className="text-2xl font-semibold leading-none text-white">
+                  12.4
+                </span>
+                <span className="text-xs text-slate-400">מרחק (ק״מ)</span>
+              </div>
             </div>
           </div>
 
           {/* סרגל פעולות תחתון */}
           <div className="mv-card mt-8 flex items-center justify-between gap-2 rounded-2xl px-3 py-3">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="md"
               onClick={onFinish}
-              className="rounded-xl bg-rose-500/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+              className="rounded-xl border-rose-300/30 bg-rose-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 focus-visible:ring-2 focus-visible:ring-rose-300"
             >
               סיום
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              onClick={() => setIsPaused((prev) => !prev)}
-              className="mv-btn-primary rounded-xl px-6 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsRidePaused((prev) => !prev)}
+              className="rounded-xl px-6 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-300"
             >
-              {isPaused ? "המשך" : "השהה"}
-            </button>
+              {isRidePaused ? "המשך" : "השהה"}
+            </Button>
 
-            <button
-              type="button"
-              className="mv-pill inline-flex h-10 w-10 items-center justify-center text-base text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-              aria-label="מצלמה"
+            <Button
+              variant="ghost"
+              size="md"
+              className="h-10 w-10 rounded-xl p-0 text-base text-slate-200 focus-visible:ring-2 focus-visible:ring-emerald-300"
+              aria-label="צילום רגע"
             >
-              ☐
-            </button>
+              📷
+            </Button>
           </div>
         </div>
       </section>
@@ -160,10 +208,17 @@ function App() {
    * מסך Home/Dashboard זמני.
    * @returns {JSX.Element} בלוק בית עם hero, כרטיסים וסטטיסטיקות.
    */
-  const renderHomeScreen = ({ isRideActive, onNavigate }) => (
+  const renderHomeScreen = ({
+    isRideActive,
+    isRideMinimized,
+    setIsRideActive,
+    setIsRidePaused,
+    setIsRideMinimized,
+    onNavigate,
+  }) => (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
       <main className="mt-6 flex-1">
-        {renderActiveRideBanner({ isRideActive, onNavigate })}
+        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
 
         {/* Hero ראשי למסך הבית */}
         <section className="grid grid-cols-1 items-center gap-5 md:grid-cols-2">
@@ -172,7 +227,18 @@ function App() {
               שלום שמואל
             </h1>
             <p className="mt-2 text-lg text-slate-300">מוכן לרכיבה</p>
-            <Button variant="primary" size="lg" className="mt-6">
+            <Button
+              variant="primary"
+              size="lg"
+              className="mt-6"
+              onClick={() => {
+                /* זרימת התחלה ישירה מהבית: הפעלה, איפוס מצבי ביניים ומעבר ללשונית רכיבה. */
+                setIsRideActive(true);
+                setIsRidePaused(false);
+                setIsRideMinimized(false);
+                onNavigate("ride");
+              }}
+            >
               התחל רכיבה
             </Button>
           </div>
@@ -245,10 +311,14 @@ function App() {
    * מסך Routes זמני עם פילטרים וכרטיסי מסלול.
    * @returns {JSX.Element} רשימת מסלולים עם פעולות Placeholder.
    */
-  const renderRoutesScreen = ({ isRideActive, onNavigate }) => (
+  const renderRoutesScreen = ({
+    isRideActive,
+    isRideMinimized,
+    onNavigate,
+  }) => (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
       <main className="mt-6 flex-1">
-        {renderActiveRideBanner({ isRideActive, onNavigate })}
+        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
 
         {/* כותרת מסך + שורת חיפוש */}
         <section className="transition-all duration-300 ease-out">
@@ -456,25 +526,62 @@ function App() {
    * מסך רכיבה בלשונית ride: מצב מוכן או HUD פעיל במסך מלא.
    * @param {Object} params - מאפייני תצוגה.
    * @param {boolean} params.isRideActive - האם רכיבה פעילה כרגע.
+   * @param {boolean} params.isRidePaused - האם רכיבה בהשהיה.
+   * @param {boolean} params.isRideMinimized - האם הרכיבה במצב מזעור.
+   * @param {number} params.rideElapsedSeconds - זמן רכיבה מצטבר בשניות.
    * @param {(value: boolean) => void} params.setIsRideActive - עדכון מצב רכיבה פעילה.
+   * @param {(value: boolean) => void} params.setIsRidePaused - עדכון מצב השהיה.
+   * @param {(value: boolean) => void} params.setIsRideMinimized - עדכון מצב מזעור HUD.
+   * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - ניווט בין טאבים.
    * @returns {JSX.Element} מסך ride בהתאם למצב הפעילות.
    */
-  const renderRideScreen = ({ isRideActive, setIsRideActive }) => {
-    if (isRideActive) {
-      return <RideActiveHud onFinish={() => setIsRideActive(false)} />;
+  const renderRideScreen = ({
+    isRideActive,
+    isRidePaused,
+    isRideMinimized,
+    rideElapsedSeconds,
+    setIsRideActive,
+    setIsRidePaused,
+    setIsRideMinimized,
+    onNavigate,
+  }) => {
+    if (isRideActive && !isRideMinimized) {
+      return (
+        <RideActiveHud
+          rideElapsedSeconds={rideElapsedSeconds}
+          isRidePaused={isRidePaused}
+          setIsRidePaused={setIsRidePaused}
+          onMinimize={() => {
+            setIsRideMinimized(true);
+            onNavigate("home");
+          }}
+          onFinish={() => {
+            setIsRideActive(false);
+          }}
+        />
+      );
     }
 
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
         <main className="mt-6 flex flex-1 items-center justify-center">
           {/* מסך מוכנות לרכיבה לפני כניסה ל־HUD */}
-          <GlassCard className="w-full max-w-xl text-center" title="מוכן לרכיבה?">
-            <p className="text-sm text-slate-300">הפעל מצב רכיבה פעילה לממשק מלא ללא ניווט.</p>
+          <GlassCard
+            className="w-full max-w-xl text-center"
+            title="מוכן לרכיבה?"
+          >
+            <p className="text-sm text-slate-300">
+              הפעל מצב רכיבה פעילה לממשק מלא ללא ניווט.
+            </p>
 
             {/* שורת סטטוס קצרה לפני יציאה לרכיבה */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <span className="mv-pill px-3 py-1 text-xs font-medium text-emerald-200">GPS: מוכן</span>
-              <span className="mv-pill px-3 py-1 text-xs text-slate-200">דיוק משוער: גבוה</span>
+              <span className="mv-pill px-3 py-1 text-xs font-medium text-emerald-200">
+                GPS: מוכן
+              </span>
+              <span className="mv-pill px-3 py-1 text-xs text-slate-200">
+                דיוק משוער: גבוה
+              </span>
             </div>
 
             {/* בחירת מסלול אופציונלית: שני קונטרולים מאותה משפחת עיצוב (pill/glass) */}
@@ -501,13 +608,20 @@ function App() {
             </div>
 
             {/* הערת בטיחות לפני התחלת רכיבה */}
-            <p className="mt-4 text-xs text-slate-400">טיפ: בדוק קסדה ואורות לפני יציאה</p>
+            <p className="mt-4 text-xs text-slate-400">
+              טיפ: בדוק קסדה ואורות לפני יציאה
+            </p>
 
             <Button
               variant="primary"
               size="lg"
               className="mt-6 w-full"
-              onClick={() => setIsRideActive(true)}
+              onClick={() => {
+                /* כניסה לרכיבה פעילה תמיד מתחילה במצב לא מושהה. */
+                setIsRidePaused(false);
+                setIsRideMinimized(false);
+                setIsRideActive(true);
+              }}
             >
               התחל רכיבה
             </Button>
@@ -523,10 +637,14 @@ function App() {
    * @param {string} subtitle - תיאור קצר למסך.
    * @returns {JSX.Element} מסך זכוכית בסיסי עם תוכן זמני.
    */
-  const renderPlaceholderScreen = (title, subtitle, { isRideActive, onNavigate }) => (
+  const renderPlaceholderScreen = (
+    title,
+    subtitle,
+    { isRideActive, isRideMinimized, onNavigate },
+  ) => (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
       <main className="mt-6 flex-1">
-        {renderActiveRideBanner({ isRideActive, onNavigate })}
+        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
 
         <section>
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
@@ -552,32 +670,62 @@ function App() {
 
   return (
     <AppShell>
-      {({ activeTab, isRideActive, setIsRideActive, onNavigate }) => {
+      {({
+        activeTab,
+        isRideActive,
+        setIsRideActive,
+        isRidePaused,
+        setIsRidePaused,
+        isRideMinimized,
+        setIsRideMinimized,
+        rideElapsedSeconds,
+        onNavigate,
+      }) => {
         /* מיפוי תצוגה לפי הטאב הפעיל (ללא Router בשלב זה). */
         if (activeTab === "home") {
-          return renderHomeScreen({ isRideActive, onNavigate });
+          return renderHomeScreen({
+            isRideActive,
+            isRideMinimized,
+            setIsRideActive,
+            setIsRidePaused,
+            setIsRideMinimized,
+            onNavigate,
+          });
         }
 
         if (activeTab === "routes") {
-          return renderRoutesScreen({ isRideActive, onNavigate });
+          return renderRoutesScreen({
+            isRideActive,
+            isRideMinimized,
+            onNavigate,
+          });
         }
 
         if (activeTab === "ride") {
-          return renderRideScreen({ isRideActive, setIsRideActive });
+          return renderRideScreen({
+            isRideActive,
+            isRidePaused,
+            isRideMinimized,
+            rideElapsedSeconds,
+            setIsRideActive,
+            setIsRidePaused,
+            setIsRideMinimized,
+            onNavigate,
+          });
         }
 
         if (activeTab === "history") {
           return renderPlaceholderScreen(
             "היסטוריה",
             "כאן יוצגו הרכיבות הקודמות שלך",
-            { isRideActive, onNavigate },
+            { isRideActive, isRideMinimized, onNavigate },
           );
         }
 
         return renderPlaceholderScreen(
           "האופנוע שלי",
           "כאן תנהל תחזוקה ומצב כלי",
-          { isRideActive, onNavigate },
+          { isRideActive, isRideMinimized, onNavigate },
         );
       }}
     </AppShell>
