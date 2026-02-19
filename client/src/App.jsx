@@ -29,6 +29,13 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
 
   /*
+   * מצבי UI מקומיים למסך מסלולים (חיפוש + פילטר טווח).
+   */
+  const [routesSearchQuery, setRoutesSearchQuery] = useState("");
+  const [selectedRoutesFilter, setSelectedRoutesFilter] = useState("הכל");
+  const [isRoutesFilterMenuOpen, setIsRoutesFilterMenuOpen] = useState(false);
+
+  /*
    * תצוגה מקומית של תמונת האופנוע שנבחרה (ללא העלאה לשרת בשלב זה).
    */
   const [bikePhotoPreview, setBikePhotoPreview] = useState("");
@@ -70,6 +77,8 @@ function App() {
 
   const filterChips = ["הכל", "קצר", "בינוני", "ארוך", "שטח"];
 
+  const routesFilterOptions = ["הכל", "קצר", "בינוני", "ארוך"];
+
   const historyFilters = ["הכל", "שבוע", "חודש", "שנה"];
 
   /*
@@ -108,6 +117,23 @@ function App() {
   ];
 
   /**
+   * מחזיר קטגוריית אורך למסלול לפי מרחק ק"מ.
+   * @param {number} distanceKm - מרחק המסלול בקילומטרים.
+   * @returns {"קצר"|"בינוני"|"ארוך"} קטגוריית טווח למסך המסלולים.
+   */
+  const getRouteLengthCategory = (distanceKm) => {
+    if (distanceKm <= 40) {
+      return "קצר";
+    }
+
+    if (distanceKm <= 80) {
+      return "בינוני";
+    }
+
+    return "ארוך";
+  };
+
+  /**
    * באנר רכיבה פעילה לטאבים שאינם רכיבה.
    * @param {Object} params - מאפייני הבאנר.
    * @param {boolean} params.isRideActive - האם רכיבה פעילה כרגע.
@@ -141,6 +167,7 @@ function App() {
    * @param {number} props.rideElapsedSeconds - זמן רכיבה מצטבר בשניות.
    * @param {boolean} props.isRidePaused - האם הרכיבה במצב השהיה.
    * @param {(value: boolean) => void} props.setIsRidePaused - עדכון מצב השהיה.
+   * @param {{title: string, from: string, to: string} | null} props.selectedRoute - מסלול שנבחר מראש למסך רכיבה.
    * @param {() => void} props.onMinimize - מזעור HUD וחזרה למעטפת רגילה.
    * @param {() => void} props.onFinish - סיום רכיבה פעילה וחזרה למצב רגיל.
    * @returns {JSX.Element} מסך רכיבה פעילה Fullscreen.
@@ -149,6 +176,7 @@ function App() {
     rideElapsedSeconds,
     isRidePaused,
     setIsRidePaused,
+    selectedRoute,
     onMinimize,
     onFinish,
   }) {
@@ -186,6 +214,18 @@ function App() {
             <p className="text-6xl font-bold tracking-wider text-white sm:text-7xl">
               {hours}:{minutes}:{seconds}
             </p>
+
+            {/* אינדיקציה למסלול פעיל גם בזמן HUD במסך מלא */}
+            <div className="mx-auto mt-4 max-w-md rounded-xl border border-white/10 bg-slate-900/45 px-3 py-2 text-sm">
+              <p className="text-slate-200">
+                מסלול נבחר: {selectedRoute ? selectedRoute.title : "ללא"}
+              </p>
+              {selectedRoute && (
+                <p className="mt-1 text-xs text-slate-400">
+                  {selectedRoute.from} → {selectedRoute.to}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* KPI צף בסגנון נקי: 3 עמודות עם אייקון, ערך גדול ותווית קטנה */}
@@ -268,6 +308,7 @@ function App() {
     setIsRideActive,
     setIsRidePaused,
     setIsRideMinimized,
+    setSelectedRoute,
     onNavigate,
   }) => (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
@@ -287,6 +328,8 @@ function App() {
               className="mt-6"
               onClick={() => {
                 /* זרימת התחלה ישירה מהבית: הפעלה, איפוס מצבי ביניים ומעבר ללשונית רכיבה. */
+                /* התחלה מהבית תמיד ללא מסלול מוקדם כדי למנוע בחירה ישנה. */
+                setSelectedRoute(null);
                 setIsRideActive(true);
                 setIsRidePaused(false);
                 setIsRideMinimized(false);
@@ -362,219 +405,154 @@ function App() {
   );
 
   /**
-   * מסך Routes זמני עם פילטרים וכרטיסי מסלול.
-   * @returns {JSX.Element} רשימת מסלולים עם פעולות Placeholder.
+   * מסך Routes בסגנון MotoVibe עם חיפוש, פילטר ותצוגת כרטיסים.
+   * @returns {JSX.Element} מסך מסלולים מחובר לזרימת התחלת רכיבה.
    */
-  const renderRoutesScreen = ({
-    isRideActive,
-    isRideMinimized,
-    onNavigate,
-  }) => (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
-      <main className="mt-6 flex-1">
-        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
+  const renderRoutesScreen = ({ isRideActive, isRideMinimized, onNavigate }) => {
+    /* סינון מקומי בסיסי למסלולים לפי חיפוש וכרטיסיית טווח. */
+    const normalizedSearch = routesSearchQuery.trim().toLowerCase();
+    const visibleRoutes = routes.filter((route) => {
+      const matchesSearch = route.title.toLowerCase().includes(normalizedSearch);
+      const matchesFilter =
+        selectedRoutesFilter === "הכל" ||
+        getRouteLengthCategory(route.distanceKm) === selectedRoutesFilter;
 
-        {/* כותרת מסך + שורת חיפוש */}
-        <section className="transition-all duration-300 ease-out">
-          <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
-            מסלולים
-          </h1>
-          <p className="mt-2 text-base text-slate-300 sm:text-lg">
-            בחר מסלול וצא לרכיבה
-          </p>
+      return matchesSearch && matchesFilter;
+    });
 
-          <div className="mv-card mt-5 p-2">
-            <input
-              type="search"
-              placeholder="חפש מסלול..."
-              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-            />
-          </div>
+    const closeRoutesDropdown = () => setIsRoutesFilterMenuOpen(false);
 
-          {/* שבבי פילטר מקומיים בלבד (ללא לוגיקת סינון אמיתית עדיין) */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {filterChips.map((chip) => {
-              const isSelected = selectedChip === chip;
-              return (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setSelectedChip(chip)}
-                  className={[
-                    "mv-pill px-3 py-1 text-xs font-medium transition",
-                    isSelected
-                      ? "text-emerald-200 ring-1 ring-emerald-300/40"
-                      : "text-slate-300 hover:text-white",
-                  ].join(" ")}
-                  aria-pressed={isSelected}
-                >
-                  {chip}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+    return (
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+        <main className="mt-6 flex-1">
+          {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
 
-        {/*
-          בלוק רשימת המסלולים.
-          מוסתר כאשר יש selectedRoute כדי לפנות מקום לתצוגת פרטים.
-        */}
-        <section
-          className={[
-            "mt-6 space-y-4 transition-all duration-300 ease-out",
-            selectedRoute
-              ? "pointer-events-none h-0 translate-y-2 overflow-hidden opacity-0"
-              : "translate-y-0 opacity-100",
-          ].join(" ")}
-        >
-          {routes.map((route) => (
-            <GlassCard
-              key={route.id}
-              right={
-                <button
-                  type="button"
-                  className="mv-pill inline-flex h-8 w-8 items-center justify-center text-sm text-slate-300 hover:text-white"
-                  aria-label="מחק מסלול"
-                >
-                  ✕
-                </button>
-              }
-            >
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,220px)_1fr] md:items-center">
-                <div className="relative h-28 overflow-hidden rounded-xl bg-slate-900/80 ring-1 ring-white/10">
-                  <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.14)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.14)_1px,transparent_1px)] bg-size-[22px_22px]" />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(20,184,166,0.24),transparent_58%)]" />
-                </div>
+          {/* כותרת מסך מסלולים */}
+          <section>
+            <h1 className="text-3xl font-bold leading-tight sm:text-4xl">מסלולים</h1>
+            <p className="mt-2 text-base text-slate-300 sm:text-lg">בחר מסלול וצא לרכיבה</p>
 
-                <div>
-                  <h3 className="text-base font-semibold text-slate-100">
-                    {route.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {route.distanceKm} ק״מ • {route.etaMin} דק׳
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {route.tags.map((tag) => (
-                      <span
-                        key={`${route.id}-${tag}`}
-                        className="mv-pill px-2.5 py-1 text-xs text-slate-200"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* פעולות מסלול: מעבר לפרטים או התחלת רכיבה (Placeholder) */}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => setSelectedRoute(route)}
-                    >
-                      צפה
-                    </Button>
-                    <Button variant="ghost" size="md">
-                      התחל רכיבה
-                    </Button>
-                  </div>
-                </div>
+            {/* שורת חיפוש + סינון בסגנון History */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="mv-card relative flex-1 p-2">
+                <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                  🔎
+                </span>
+                <input
+                  type="search"
+                  value={routesSearchQuery}
+                  onChange={(event) => setRoutesSearchQuery(event.target.value)}
+                  placeholder="חפש מסלול..."
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 py-2 pe-3 ps-9 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                />
               </div>
-            </GlassCard>
-          ))}
-        </section>
 
-        {/*
-          תצוגת פרטי מסלול.
-          מוצגת רק לאחר בחירה של Route מתוך הרשימה.
-        */}
-        <section
-          className={[
-            "mt-6 transition-all duration-300 ease-out",
-            selectedRoute
-              ? "translate-y-0 opacity-100"
-              : "pointer-events-none h-0 -translate-y-2 overflow-hidden opacity-0",
-          ].join(" ")}
-        >
-          {selectedRoute && (
-            <div className="space-y-4">
-              <button
-                type="button"
-                className="mv-pill inline-flex items-center gap-2 px-3 py-1.5 text-sm text-slate-200 hover:text-white"
-                onClick={() => setSelectedRoute(null)}
-              >
-                <span aria-hidden="true">←</span>
-                <span>חזרה למסלולים</span>
-              </button>
-
-              <div className="mv-card relative aspect-16/7 overflow-hidden rounded-2xl border border-white/10">
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-size-[26px_26px]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(20,184,166,0.22),transparent_60%)]" />
-                <svg
-                  viewBox="0 0 100 40"
-                  className="absolute inset-0 h-full w-full"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
+              {/* דרופדאון אבסולוטי כדי לא לדחוף את ה-layout */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsRoutesFilterMenuOpen((prev) => !prev)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  aria-label="סינון"
+                  aria-expanded={isRoutesFilterMenuOpen}
                 >
-                  <path
-                    d="M6,30 C20,8 28,36 42,20 C55,8 66,28 78,18 C86,12 92,16 96,10"
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
                     fill="none"
-                    stroke="rgba(52,211,153,0.9)"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M4 6h16l-6.5 7.2v4.8l-3 1.8v-6.6L4 6Z"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {isRoutesFilterMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-40"
+                      onClick={closeRoutesDropdown}
+                      aria-label="סגור סינון"
+                    />
+
+                    <div className="absolute z-50 top-full mt-2 left-0 sm:left-auto sm:right-0 w-44 max-w-[calc(100vw-24px)] rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md shadow-lg p-2">
+                      {routesFilterOptions.map((filter) => {
+                        const isSelected = selectedRoutesFilter === filter;
+                        return (
+                          <button
+                            key={`routes-filter-${filter}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedRoutesFilter(filter);
+                              closeRoutesDropdown();
+                            }}
+                            className={[
+                              "mb-1 inline-flex w-full items-center justify-center rounded-xl border px-3 py-1.5 text-sm transition last:mb-0",
+                              isSelected
+                                ? "border-emerald-300/40 text-emerald-200"
+                                : "border-transparent text-slate-200 hover:border-white/10 hover:text-white",
+                            ].join(" ")}
+                          >
+                            {filter}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
+            </div>
+          </section>
 
-              <GlassCard title={selectedRoute.title}>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-2 text-sm text-slate-300 sm:grid-cols-3">
-                    <p>מרחק: {selectedRoute.distanceKm} ק״מ</p>
-                    <p>זמן משוער: {selectedRoute.etaMin} דק׳</p>
-                    <p>קושי: בינוני</p>
+          {/* רשימת מסלולים בכרטיסי זכוכית */}
+          <section className="mt-6 space-y-4">
+            {visibleRoutes.map((route) => (
+              <GlassCard key={route.id}>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[130px_1fr] md:items-center">
+                  {/* תצוגת מפה מינימלית בצד ימין (RTL) */}
+                  <div className="relative h-24 overflow-hidden rounded-xl bg-linear-to-br from-slate-900/90 via-slate-800/65 to-emerald-900/30 ring-1 ring-white/10">
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-size-[22px_22px]" />
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {selectedRoute.tags.map((tag) => (
-                      <span
-                        key={`detail-${selectedRoute.id}-${tag}`}
-                        className="mv-pill px-2.5 py-1 text-xs text-slate-200"
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-100">{route.title}</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {route.from} → {route.to}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {route.distanceKm} ק״מ • {route.etaMin} דק׳
+                    </p>
+
+                    {/* פעולות מסלול: תצוגה או התחלה ישירה למסך רכיבה */}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button variant="ghost" size="md">צפה</Button>
+                      <Button
+                        variant="primary"
+                        size="md"
+                        onClick={() => {
+                          /* התחלה מכרטיס מסלול: שומרים את המסלול הנבחר ומנווטים לרכיבה. */
+                          setSelectedRoute(route);
+                          onNavigate("ride");
+                        }}
                       >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" size="md">
-                      התחל רכיבה
-                    </Button>
-                    <Button variant="ghost" size="md" disabled>
-                      מחק מסלול
-                    </Button>
+                        התחל
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </GlassCard>
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* FAB ליצירת מסלול (UI בלבד, ללא פעולה כרגע) */}
-      <div className="pointer-events-none fixed bottom-24 left-4 z-30 flex items-center gap-2 md:bottom-8 md:left-6">
-        <span className="mv-pill px-3 py-1 text-xs text-slate-200">
-          צור מסלול
-        </span>
-        <button
-          type="button"
-          className="pointer-events-auto mv-card inline-flex h-12 w-12 items-center justify-center rounded-full text-2xl text-emerald-200 shadow-[0_0_24px_rgba(20,184,166,0.35)]"
-          aria-label="צור מסלול"
-        >
-          +
-        </button>
+            ))}
+          </section>
+        </main>
       </div>
-    </div>
-  );
+    );
+  };
 
   /**
    * מסך רכיבה בלשונית ride: מצב מוכן או HUD פעיל במסך מלא.
@@ -586,6 +564,7 @@ function App() {
    * @param {(value: boolean) => void} params.setIsRideActive - עדכון מצב רכיבה פעילה.
    * @param {(value: boolean) => void} params.setIsRidePaused - עדכון מצב השהיה.
    * @param {(value: boolean) => void} params.setIsRideMinimized - עדכון מצב מזעור HUD.
+  * @param {{title: string, from: string, to: string} | null} params.selectedRoute - מסלול שנבחר ממסך Routes.
    * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - ניווט בין טאבים.
    * @returns {JSX.Element} מסך ride בהתאם למצב הפעילות.
    */
@@ -597,6 +576,7 @@ function App() {
     setIsRideActive,
     setIsRidePaused,
     setIsRideMinimized,
+    selectedRoute,
     onNavigate,
   }) => {
     if (isRideActive && !isRideMinimized) {
@@ -605,6 +585,7 @@ function App() {
           rideElapsedSeconds={rideElapsedSeconds}
           isRidePaused={isRidePaused}
           setIsRidePaused={setIsRidePaused}
+          selectedRoute={selectedRoute}
           onMinimize={() => {
             setIsRideMinimized(true);
             onNavigate("home");
@@ -631,6 +612,18 @@ function App() {
               הפעל מצב רכיבה פעילה לממשק מלא ללא ניווט.
             </p>
 
+            {/* אינדיקציה למסלול שנבחר ממסך המסלולים */}
+            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2 text-sm">
+              <p className="text-slate-200">
+                מסלול נבחר: {selectedRoute ? selectedRoute.title : "ללא"}
+              </p>
+              {selectedRoute && (
+                <p className="mt-1 text-xs text-slate-400">
+                  {selectedRoute.from} → {selectedRoute.to}
+                </p>
+              )}
+            </div>
+
             {/* שורת סטטוס קצרה לפני יציאה לרכיבה */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <span className="mv-pill px-3 py-1 text-xs font-medium text-emerald-200">
@@ -645,19 +638,27 @@ function App() {
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2 text-sm">
               <span className="text-slate-300">מסלול</span>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                {/* בסיס משותף לשני הכפתורים: pill/glass זהה לגובה, רדיוס ויישור */}
+                {/* ניקוי מסלול באופן מפורש מהמשתמש ושיקוף מצב נבחר ויזואלי */}
                 <Button
                   variant="ghost"
                   size="md"
-                  className="rounded-full bg-white/5 border border-white/10 text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto text-emerald-200"
+                  onClick={() => setSelectedRoute(null)}
+                  className={[
+                    "rounded-full bg-white/5 border text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto",
+                    selectedRoute === null
+                      ? "border-emerald-300/40 text-emerald-200"
+                      : "border-white/10 text-white/80 hover:text-white",
+                  ].join(" ")}
                 >
                   ללא מסלול
                 </Button>
-                {/* מודיפייר ניטרלי: אותו בסיס בדיוק, בלי הדגשת בחירה */}
+
+                {/* מעבר יזום למסך מסלולים לבחירה, ללא בחירה אוטומטית */}
                 <Button
                   variant="ghost"
                   size="md"
                   className="rounded-full bg-white/5 border border-white/10 text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto text-white/80 hover:text-white"
+                  onClick={() => onNavigate("routes")}
                 >
                   בחר מסלול
                 </Button>
@@ -1116,6 +1117,7 @@ function App() {
             setIsRideActive,
             setIsRidePaused,
             setIsRideMinimized,
+            setSelectedRoute,
             onNavigate,
           });
         }
@@ -1137,6 +1139,7 @@ function App() {
             setIsRideActive,
             setIsRidePaused,
             setIsRideMinimized,
+            selectedRoute,
             onNavigate,
           });
         }
