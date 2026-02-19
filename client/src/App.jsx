@@ -71,10 +71,34 @@ function App() {
    * בהמשך יוחלפו בנתונים אמיתיים מהשרת.
    */
   const historyRides = [
-    { id: "ride-1", title: "טיול רכיבה ביום שבת", date: "03.12.25", duration: "1:45", distance: "72 ק״מ" },
-    { id: "ride-2", title: "נסיעה לעבודה", date: "28.11.25", duration: "0:55", distance: "21 ק״מ" },
-    { id: "ride-3", title: "טיול לילה בהרים", date: "21.11.25", duration: "2:10", distance: "94 ק״מ" },
-    { id: "ride-4", title: "סיבוב חוף ערב", date: "18.11.25", duration: "1:20", distance: "48 ק״מ" },
+    {
+      id: "ride-1",
+      title: "טיול רכיבה ביום שבת",
+      date: "03.12.25",
+      duration: "1:45",
+      distance: "72 ק״מ",
+    },
+    {
+      id: "ride-2",
+      title: "נסיעה לעבודה",
+      date: "28.11.25",
+      duration: "0:55",
+      distance: "21 ק״מ",
+    },
+    {
+      id: "ride-3",
+      title: "טיול לילה בהרים",
+      date: "21.11.25",
+      duration: "2:10",
+      distance: "94 ק״מ",
+    },
+    {
+      id: "ride-4",
+      title: "סיבוב חוף ערב",
+      date: "18.11.25",
+      duration: "1:20",
+      distance: "48 ק״מ",
+    },
   ];
 
   /**
@@ -663,7 +687,11 @@ function App() {
    * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - מעבר בין טאבים.
    * @returns {JSX.Element} מסך היסטוריית רכיבות בתצוגת MotoVibe.
    */
-  const renderHistoryScreen = ({ isRideActive, isRideMinimized, onNavigate }) => {
+  const renderHistoryScreen = ({
+    isRideActive,
+    isRideMinimized,
+    onNavigate,
+  }) => {
     /* סינון מקומי פשוט לפי שם רכיבה (case-insensitive). */
     const normalizedSearch = searchQuery.trim().toLowerCase();
     const visibleHistoryRides = historyRides.filter((ride) =>
@@ -673,11 +701,17 @@ function App() {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
         <main className="mt-6 flex-1">
-          {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
+          {renderActiveRideBanner({
+            isRideActive,
+            isRideMinimized,
+            onNavigate,
+          })}
 
           {/* כותרת מסך + כלי חיפוש/סינון מקומיים */}
           <section>
-            <h1 className="text-3xl font-bold leading-tight sm:text-4xl">היסטוריית רכיבות</h1>
+            <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
+              היסטוריית רכיבות
+            </h1>
             <p className="mt-2 text-base text-slate-300 sm:text-lg">
               כל הרכיבות האחרונות שלך במקום אחד
             </p>
@@ -772,15 +806,21 @@ function App() {
           <section className="mv-card mt-6 px-4 py-3">
             <div className="grid grid-cols-3 gap-0 text-center">
               <div className="border-e border-white/10 px-2">
-                <p className="text-2xl font-semibold leading-none text-white">12</p>
+                <p className="text-2xl font-semibold leading-none text-white">
+                  12
+                </p>
                 <p className="mt-1 text-xs text-slate-400">רכיבות</p>
               </div>
               <div className="border-e border-white/10 px-2">
-                <p className="text-2xl font-semibold leading-none text-white">14:30</p>
+                <p className="text-2xl font-semibold leading-none text-white">
+                  14:30
+                </p>
                 <p className="mt-1 text-xs text-slate-400">שעות</p>
               </div>
               <div className="px-2">
-                <p className="text-2xl font-semibold leading-none text-white">615</p>
+                <p className="text-2xl font-semibold leading-none text-white">
+                  615
+                </p>
                 <p className="mt-1 text-xs text-slate-400">ק״מ</p>
               </div>
             </div>
@@ -789,28 +829,34 @@ function App() {
           {/* רשימת רכיבות אחרונות */}
           <section className="mt-6 space-y-4">
             {visibleHistoryRides.map((ride) => (
-            <GlassCard
-              key={ride.id}
-              right={
-                <Button variant="ghost" size="md" className="h-8 w-8 rounded-full p-0 text-base">
-                  &gt;
-                </Button>
-              }
-            >
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_130px] md:items-center">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-100">{ride.title}</h3>
-                  <p className="mt-1 text-xs text-slate-400">{ride.date}</p>
+              <GlassCard
+                key={ride.id}
+                right={
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    className="h-8 w-8 rounded-full p-0 text-base"
+                  >
+                    &gt;
+                  </Button>
+                }
+              >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_130px] md:items-center">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-100">
+                      {ride.title}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-400">{ride.date}</p>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                    <span>⏱️ {ride.duration}</span>
-                    <span>📍 {ride.distance}</span>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                      <span>⏱️ {ride.duration}</span>
+                      <span>📍 {ride.distance}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="h-24 overflow-hidden rounded-xl bg-linear-to-br from-slate-900/90 via-slate-800/65 to-emerald-900/30 ring-1 ring-white/10" />
-              </div>
-            </GlassCard>
+                  <div className="h-24 overflow-hidden rounded-xl bg-linear-to-br from-slate-900/90 via-slate-800/65 to-emerald-900/30 ring-1 ring-white/10" />
+                </div>
+              </GlassCard>
             ))}
 
             {/*
