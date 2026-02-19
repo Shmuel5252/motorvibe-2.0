@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "./app/ui/components/Button";
 import GlassCard from "./app/ui/components/GlassCard";
 import AppShell from "./app/layouts/AppShell";
@@ -27,6 +27,12 @@ function App() {
    * טקסט חיפוש מקומי למסך היסטוריה (ללא API).
    */
   const [searchQuery, setSearchQuery] = useState("");
+
+  /*
+   * תצוגה מקומית של תמונת האופנוע שנבחרה (ללא העלאה לשרת בשלב זה).
+   */
+  const [bikePhotoPreview, setBikePhotoPreview] = useState("");
+  const bikePhotoInputRef = useRef(null);
 
   /*
    * Placeholder לנתוני מסלולים.
@@ -501,7 +507,7 @@ function App() {
                 <span>חזרה למסלולים</span>
               </button>
 
-              <div className="mv-card relative aspect-[16/7] overflow-hidden rounded-2xl border border-white/10">
+              <div className="mv-card relative aspect-16/7 overflow-hidden rounded-2xl border border-white/10">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-size-[26px_26px]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(20,184,166,0.22),transparent_60%)]" />
                 <svg
@@ -611,7 +617,10 @@ function App() {
     }
 
     return (
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+      <>
+        {/* נדרש Fragment כדי שהערה ו־div יהיו תחת הורה JSX יחיד */}
+        {/* overflow-x-hidden מונע גלילה אופקית/חיתוך כאשר הדרופדאון קרוב לקצה המסך */}
+        <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col overflow-x-hidden px-4 pb-10 pt-5 sm:px-6">
         <main className="mt-6 flex flex-1 items-center justify-center">
           {/* מסך מוכנות לרכיבה לפני כניסה ל־HUD */}
           <GlassCard
@@ -640,7 +649,7 @@ function App() {
                 <Button
                   variant="ghost"
                   size="md"
-                  className="rounded-full bg-white/5 border border-white/10 text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto border-emerald-400/40 text-emerald-200"
+                  className="rounded-full bg-white/5 border border-white/10 text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto text-emerald-200"
                 >
                   ללא מסלול
                 </Button>
@@ -675,7 +684,8 @@ function App() {
             </Button>
           </GlassCard>
         </main>
-      </div>
+        </div>
+      </>
     );
   };
 
@@ -697,6 +707,7 @@ function App() {
     const visibleHistoryRides = historyRides.filter((ride) =>
       ride.title.toLowerCase().includes(normalizedSearch),
     );
+    const closeDropdown = () => setIsHistoryFilterMenuOpen(false);
 
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
@@ -731,7 +742,7 @@ function App() {
                 />
               </div>
 
-              {/* בקרת סינון יחידה: כפתור אייקון + תפריט נפתח */}
+              {/* הדרופדאון אבסולוטי כדי לא לדחוף את ה-layout */}
               <div className="relative">
                 <button
                   type="button"
@@ -757,42 +768,43 @@ function App() {
                 </button>
 
                 {isHistoryFilterMenuOpen && (
-                  <div className="absolute right-0 top-full z-40 mt-2 w-40 rounded-2xl border border-white/10 bg-slate-900/85 p-2 shadow-[0_10px_35px_rgba(2,6,23,0.55)] backdrop-blur-md">
-                    {historyFilters.map((filter) => {
-                      const isSelected = selectedHistoryFilter === filter;
-                      return (
-                        <button
-                          key={`menu-${filter}`}
-                          type="button"
-                          onClick={() => {
-                            setSelectedHistoryFilter(filter);
-                            setIsHistoryFilterMenuOpen(false);
-                          }}
-                          className={[
-                            "mb-1 inline-flex w-full items-center justify-center rounded-xl border px-3 py-1.5 text-sm transition last:mb-0",
-                            isSelected
-                              ? "border-emerald-300/40 text-emerald-200"
-                              : "border-transparent text-slate-200 hover:border-white/10 hover:text-white",
-                          ].join(" ")}
-                        >
-                          {filter}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <>
+                    {/* שכבת סגירה קבועה מאחורי התפריט, לא תופסת מקום בזרימה */}
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-40"
+                      onClick={closeDropdown}
+                      aria-label="סגור סינון"
+                    />
+
+                    {/* עיגון חכם: ימין בדסקטופ רחב, ושמאל ברוחב צפוף כדי למנוע חיתוך/חריגה מהמסך */}
+                    <div className="absolute z-50 top-full mt-2 left-0 lg:left-auto lg:right-0 w-44 max-w-[min(320px,calc(100vw-24px))] rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md shadow-lg p-2">
+                      {historyFilters.map((filter) => {
+                        const isSelected = selectedHistoryFilter === filter;
+                        return (
+                          <button
+                            key={`menu-${filter}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedHistoryFilter(filter);
+                              closeDropdown();
+                            }}
+                            className={[
+                              "mb-1 inline-flex w-full items-center justify-center rounded-xl border px-3 py-1.5 text-sm transition last:mb-0",
+                              isSelected
+                                ? "border-emerald-300/40 text-emerald-200"
+                                : "border-transparent text-slate-200 hover:border-white/10 hover:text-white",
+                            ].join(" ")}
+                          >
+                            {filter}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
-
-            {/* שכבת סגירה בלחיצה מחוץ לתפריט הסינון */}
-            {isHistoryFilterMenuOpen && (
-              <button
-                type="button"
-                aria-label="סגור תפריט סינון"
-                className="fixed inset-0 z-30 cursor-default"
-                onClick={() => setIsHistoryFilterMenuOpen(false)}
-              />
-            )}
 
             {/* סיכום מסנן נבחר (ללא שורת צ'יפים כפולה) */}
             <div className="mt-3">
@@ -869,6 +881,182 @@ function App() {
       </div>
     );
   };
+
+  /**
+   * מסך "האופנוע שלי" עם Hero, סטטיסטיקות ותחזוקה.
+   * @param {Object} params - מאפייני תצוגה למסך.
+   * @param {boolean} params.isRideActive - האם רכיבה פעילה כרגע.
+   * @param {boolean} params.isRideMinimized - האם רכיבה פעילה במצב מזעור.
+   * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - ניווט בין טאבים.
+   * @returns {JSX.Element} מסך ניהול האופנוע בתצוגת MotoVibe.
+   */
+  const renderBikeScreen = ({ isRideActive, isRideMinimized, onNavigate }) => (
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+      <main className="mt-6 flex-1">
+        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
+
+        {/* כותרת ראשית למסך האופנוע */}
+        <section>
+          <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
+            האופנוע שלי
+          </h1>
+          <p className="mt-2 text-base text-slate-300 sm:text-lg">
+            ניהול פרטי האופנוע ותחזוקה
+          </p>
+        </section>
+
+        {/* Hero ראשי עם תחושת תמונה + פעולות מהירות */}
+        <section className="mt-6">
+          <GlassCard
+            title="Yamaha MT-07"
+            right={
+              <div className="flex items-center gap-2">
+                <span className="mv-pill px-2.5 py-1 text-xs font-medium text-emerald-200">
+                  תקין
+                </span>
+                <Button variant="ghost" size="md" className="text-xs">
+                  ערוך
+                </Button>
+              </div>
+            }
+          >
+            <p className="text-sm text-slate-300">2023 • Matte Black</p>
+
+            <div className="relative mt-4 h-44 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-slate-900/90 via-slate-800/60 to-emerald-900/25">
+              {/* רקע דמוי תמונה עם שכבת גריד עדינה + זוהר ירקרק */}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[24px_24px]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(20,184,166,0.18),transparent_55%)]" />
+
+              {bikePhotoPreview ? (
+                <img
+                  src={bikePhotoPreview}
+                  alt="תצוגת אופנוע"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-end p-3">
+                  <span className="mv-pill px-2.5 py-1 text-xs text-slate-200">
+                    תצוגת תמונת אופנוע
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 flex justify-start">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => bikePhotoInputRef.current?.click()}
+              >
+                העלה תמונה
+              </Button>
+            </div>
+
+            <input
+              ref={bikePhotoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) {
+                  return;
+                }
+
+                if (bikePhotoPreview.startsWith("blob:")) {
+                  URL.revokeObjectURL(bikePhotoPreview);
+                }
+
+                const localPreviewUrl = URL.createObjectURL(file);
+                setBikePhotoPreview(localPreviewUrl);
+
+                /*
+                 * בשלב עתידי נחבר כאן העלאה אמיתית לשרת ונשמור URL קבוע.
+                 * כרגע זו תצוגה מקומית בלבד לצורך UX.
+                 */
+              }}
+            />
+          </GlassCard>
+        </section>
+
+        {/* שורת סטטוסים קצרה במראה פרימיום */}
+        <section className="mt-4 flex flex-wrap gap-2">
+          <span className="mv-pill px-3 py-1 text-xs text-slate-200">
+            ק״מ: 12,450
+          </span>
+          <span className="mv-pill px-3 py-1 text-xs text-slate-200">
+            טיפול הבא: 800 ק״מ
+          </span>
+          <span className="mv-pill px-3 py-1 text-xs text-slate-200">
+            צמיגים: 32 PSI
+          </span>
+        </section>
+
+        {/* בלוק תחזוקה והתראות */}
+        <section className="mt-6">
+          <h2 className="text-xl font-semibold text-slate-100">
+            התראות ותחזוקה
+          </h2>
+
+          <div className="mt-4 space-y-3">
+            <GlassCard
+              title="לחץ אוויר תקין"
+              right={
+                <span className="mv-pill px-2.5 py-1 text-xs text-emerald-200">
+                  תקין
+                </span>
+              }
+            >
+              <p className="text-sm text-slate-300">
+                הלחץ בגלגלים מאוזן ומתאים לרכיבה יומית.
+              </p>
+              <div className="mt-3">
+                <Button variant="ghost" size="md">
+                  בדיקה
+                </Button>
+              </div>
+            </GlassCard>
+
+            <GlassCard
+              title="שימון שרשרת"
+              right={
+                <span className="mv-pill px-2.5 py-1 text-xs text-amber-200">
+                  בקרוב
+                </span>
+              }
+            >
+              <p className="text-sm text-slate-300">
+                מומלץ לבצע שימון ב־150 הק״מ הקרובים.
+              </p>
+              <div className="mt-3">
+                <Button variant="ghost" size="md">
+                  סמן כבוצע
+                </Button>
+              </div>
+            </GlassCard>
+
+            <GlassCard
+              title="בלמים"
+              right={
+                <span className="mv-pill px-2.5 py-1 text-xs text-rose-200">
+                  דורש תשומת לב
+                </span>
+              }
+            >
+              <p className="text-sm text-slate-300">
+                נמצאה שחיקה ברפידות, מומלץ לבצע בדיקה בהקדם.
+              </p>
+              <div className="mt-3">
+                <Button variant="ghost" size="md">
+                  בדיקה
+                </Button>
+              </div>
+            </GlassCard>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 
   /**
    * Placeholder למסכים שטרם מומשו.
@@ -961,11 +1149,11 @@ function App() {
           });
         }
 
-        return renderPlaceholderScreen(
-          "האופנוע שלי",
-          "כאן תנהל תחזוקה ומצב כלי",
-          { isRideActive, isRideMinimized, onNavigate },
-        );
+        return renderBikeScreen({
+          isRideActive,
+          isRideMinimized,
+          onNavigate,
+        });
       }}
     </AppShell>
   );
