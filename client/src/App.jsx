@@ -18,6 +18,11 @@ function App() {
   const [selectedRoute, setSelectedRoute] = useState(null);
 
   /*
+   * כלל תצוגה: מסלול נבחר יוצג ב־Ride רק אם ההתחלה הייתה ממסך מסלולים.
+   */
+  const [didStartFromRoute, setDidStartFromRoute] = useState(false);
+
+  /*
    * פילטר מקומי למסך היסטוריה (UI בלבד ללא סינון נתונים אמיתי בשלב זה).
    */
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState("הכל");
@@ -309,6 +314,7 @@ function App() {
     setIsRidePaused,
     setIsRideMinimized,
     setSelectedRoute,
+    setDidStartFromRoute,
     onNavigate,
   }) => (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
@@ -328,12 +334,12 @@ function App() {
               className="mt-6"
               onClick={() => {
                 /* זרימת התחלה ישירה מהבית: הפעלה, איפוס מצבי ביניים ומעבר ללשונית רכיבה. */
-                /* התחלה מהבית תמיד ללא מסלול מוקדם כדי למנוע בחירה ישנה. */
+                /* התחלה מהבית תמיד ללא מסלול מוקדם וללא שיוך למסלול. */
                 setSelectedRoute(null);
                 setIsRideActive(true);
                 setIsRidePaused(false);
                 setIsRideMinimized(false);
-                onNavigate("ride");
+                onNavigate("ride", { source: "homeStart" });
               }}
             >
               התחל רכיבה
@@ -408,7 +414,15 @@ function App() {
    * מסך Routes בסגנון MotoVibe עם חיפוש, פילטר ותצוגת כרטיסים.
    * @returns {JSX.Element} מסך מסלולים מחובר לזרימת התחלת רכיבה.
    */
-  const renderRoutesScreen = ({ isRideActive, isRideMinimized, onNavigate }) => {
+  const renderRoutesScreen = ({
+    isRideActive,
+    isRideMinimized,
+    setIsRideActive,
+    setIsRidePaused,
+    setIsRideMinimized,
+    setDidStartFromRoute,
+    onNavigate,
+  }) => {
     /* סינון מקומי בסיסי למסלולים לפי חיפוש וכרטיסיית טווח. */
     const normalizedSearch = routesSearchQuery.trim().toLowerCase();
     const visibleRoutes = routes.filter((route) => {
@@ -536,9 +550,14 @@ function App() {
                         variant="primary"
                         size="md"
                         onClick={() => {
-                          /* התחלה מכרטיס מסלול: שומרים את המסלול הנבחר ומנווטים לרכיבה. */
+                          /* 1) שמירת מסלול נבחר מתוך הכרטיס */
                           setSelectedRoute(route);
-                          onNavigate("ride");
+                          /* 2) הפעלת מצב רכיבה פעילה */
+                          setIsRidePaused(false);
+                          setIsRideMinimized(false);
+                          setIsRideActive(true);
+                          /* 3) מעבר למסך רכיבה ממקור מסלול */
+                          onNavigate("ride", { source: "routeStart" });
                         }}
                       >
                         התחל
@@ -565,6 +584,8 @@ function App() {
    * @param {(value: boolean) => void} params.setIsRidePaused - עדכון מצב השהיה.
    * @param {(value: boolean) => void} params.setIsRideMinimized - עדכון מצב מזעור HUD.
   * @param {{title: string, from: string, to: string} | null} params.selectedRoute - מסלול שנבחר ממסך Routes.
+  * @param {boolean} params.didStartFromRoute - האם ההתחלה למסך Ride הגיעה ממסך מסלולים.
+  * @param {(value: boolean) => void} params.setDidStartFromRoute - עדכון כלל תצוגת מסלול ב־Ride.
    * @param {(tabKey: "home" | "routes" | "ride" | "history" | "bike") => void} params.onNavigate - ניווט בין טאבים.
    * @returns {JSX.Element} מסך ride בהתאם למצב הפעילות.
    */
@@ -577,21 +598,32 @@ function App() {
     setIsRidePaused,
     setIsRideMinimized,
     selectedRoute,
+    didStartFromRoute,
+    setDidStartFromRoute,
     onNavigate,
   }) => {
+    /* מציגים מסלול רק אם המשתמש התחיל רכיבה מתוך מסך Routes. */
+    const rideSelectedRoute = didStartFromRoute && selectedRoute ? selectedRoute : null;
+
     if (isRideActive && !isRideMinimized) {
       return (
         <RideActiveHud
           rideElapsedSeconds={rideElapsedSeconds}
           isRidePaused={isRidePaused}
           setIsRidePaused={setIsRidePaused}
-          selectedRoute={selectedRoute}
+          selectedRoute={rideSelectedRoute}
           onMinimize={() => {
             setIsRideMinimized(true);
             onNavigate("home");
           }}
           onFinish={() => {
+            /* בסיום רכיבה חוזרים לבית ומאפסים שיוך מסלול/מצב התחלה */
             setIsRideActive(false);
+            setIsRidePaused(false);
+            setSelectedRoute(null);
+            setDidStartFromRoute(false);
+            setIsRideMinimized(false);
+            onNavigate("home");
           }}
         />
       );
@@ -615,11 +647,11 @@ function App() {
             {/* אינדיקציה למסלול שנבחר ממסך המסלולים */}
             <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2 text-sm">
               <p className="text-slate-200">
-                מסלול נבחר: {selectedRoute ? selectedRoute.title : "ללא"}
+                מסלול נבחר: {rideSelectedRoute ? rideSelectedRoute.title : "ללא"}
               </p>
-              {selectedRoute && (
+              {rideSelectedRoute && (
                 <p className="mt-1 text-xs text-slate-400">
-                  {selectedRoute.from} → {selectedRoute.to}
+                  {rideSelectedRoute.from} → {rideSelectedRoute.to}
                 </p>
               )}
             </div>
@@ -642,10 +674,14 @@ function App() {
                 <Button
                   variant="ghost"
                   size="md"
-                  onClick={() => setSelectedRoute(null)}
+                  onClick={() => {
+                    /* בחירה מפורשת ב"ללא מסלול" מאפסת גם את כלל "התחיל ממסלולים". */
+                    setSelectedRoute(null);
+                    setDidStartFromRoute(false);
+                  }}
                   className={[
                     "rounded-full bg-white/5 border text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto",
-                    selectedRoute === null
+                    !rideSelectedRoute
                       ? "border-emerald-300/40 text-emerald-200"
                       : "border-white/10 text-white/80 hover:text-white",
                   ].join(" ")}
@@ -1109,6 +1145,22 @@ function App() {
         rideElapsedSeconds,
         onNavigate,
       }) => {
+        /* מסלול מוצג רק אם התחלנו רכיבה מתוך מסלולים; מעבר רגיל ל-Ride מנקה מסלול. */
+        const navigateTo = (tabKey, options = { source: "other" }) => {
+          const source = options?.source ?? "other";
+
+          if (tabKey === "ride" && source !== "routeStart") {
+            setSelectedRoute(null);
+            setDidStartFromRoute(false);
+          }
+
+          if (tabKey === "ride" && source === "routeStart") {
+            setDidStartFromRoute(true);
+          }
+
+          onNavigate(tabKey);
+        };
+
         /* מיפוי תצוגה לפי הטאב הפעיל (ללא Router בשלב זה). */
         if (activeTab === "home") {
           return renderHomeScreen({
@@ -1118,7 +1170,8 @@ function App() {
             setIsRidePaused,
             setIsRideMinimized,
             setSelectedRoute,
-            onNavigate,
+            setDidStartFromRoute,
+            onNavigate: navigateTo,
           });
         }
 
@@ -1126,7 +1179,11 @@ function App() {
           return renderRoutesScreen({
             isRideActive,
             isRideMinimized,
-            onNavigate,
+            setIsRideActive,
+            setIsRidePaused,
+            setIsRideMinimized,
+            setDidStartFromRoute,
+            onNavigate: navigateTo,
           });
         }
 
@@ -1140,7 +1197,9 @@ function App() {
             setIsRidePaused,
             setIsRideMinimized,
             selectedRoute,
-            onNavigate,
+            didStartFromRoute,
+            setDidStartFromRoute,
+            onNavigate: navigateTo,
           });
         }
 
@@ -1148,14 +1207,14 @@ function App() {
           return renderHistoryScreen({
             isRideActive,
             isRideMinimized,
-            onNavigate,
+            onNavigate: navigateTo,
           });
         }
 
         return renderBikeScreen({
           isRideActive,
           isRideMinimized,
-          onNavigate,
+          onNavigate: navigateTo,
         });
       }}
     </AppShell>
