@@ -16,7 +16,12 @@ async function createRoute(req, res) {
     }
 
     const owner = req.user.userId;
-    const { title, start, end } = req.body;
+    const { title, start, end, routeType, difficulty, isTwisty } = req.body;
+
+    // ברירות מחדל למטא-דאטה של מסלול אם לא נשלחו מהלקוח
+    const safeRouteType = routeType ?? 'עירוני';
+    const safeDifficulty = difficulty ?? 'בינוני';
+    const safeIsTwisty = isTwisty ?? false;
 
     let dir;
     try {
@@ -39,6 +44,9 @@ async function createRoute(req, res) {
         title,
         start,
         end,
+        routeType: safeRouteType,
+        difficulty: safeDifficulty,
+        isTwisty: safeIsTwisty,
         visibility: 'private',
         distanceKm,
         etaMinutes,
@@ -91,7 +99,7 @@ async function updateMyRoute(req, res) {
     }
 
     const update = {};
-    const fields = ['title', 'start', 'end'];
+    const fields = ['title', 'start', 'end', 'routeType', 'difficulty', 'isTwisty'];
     for (const key of fields) {
         if (req.body[key] !== undefined) update[key] = req.body[key];
     }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import {
   DirectionsRenderer,
   GoogleMap,
@@ -15,6 +16,10 @@ const ISRAEL_DEFAULT_ZOOM = 11;
 const MAP_LOADER_ID = "motovibe-maps";
 /* ספריות טעינת מפה יציבות (כולל Places להצעות אוטומטיות). */
 const MAP_LIBRARIES = ["maps", "places"];
+/* תיקון 404: בסיס ה-API חייב להצביע לשרת backend ולא ל-origin של Vite. */
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const AUTH_TOKEN_KEY = "mv_token";
 
 /**
  * שכבת מפה לרכיבה פעילה כאשר קיים מפתח Google Maps.
@@ -75,6 +80,7 @@ function RideActiveMap({
  */
 function App() {
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const apiClient = useMemo(() => axios.create({ baseURL: API_BASE_URL }), []);
 
   const LOADER_OPTIONS = useMemo(
     () => ({
@@ -210,6 +216,17 @@ function App() {
       tags: ["כביש", "לילה", "מהיר"],
     },
   ]);
+  const [authToken, setAuthToken] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [isRoutesLoading, setIsRoutesLoading] = useState(false);
+  const [routesLoadError, setRoutesLoadError] = useState("");
 
   /* טופס יצירה מקומי למסלול חדש במסך Routes. */
   const [newRouteTitle, setNewRouteTitle] = useState("");
@@ -240,6 +257,155 @@ function App() {
     !googleMapsLoadError &&
     typeof window !== "undefined" &&
     Boolean(window.google?.maps?.places);
+
+  /* טיפול מרכזי ב-401: ניקוי טוקן, מעבר למצב אורח ותצוגת מסך אימות. */
+  const handleUnauthorized = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+
+    delete apiClient.defaults.headers.common.Authorization;
+    setAuthToken("");
+    setIsAuthenticated(false);
+    setShowAuthScreen(true);
+  };
+
+  /* הצלחת אימות: שמירה ב-localStorage, חיבור Bearer ועדכון סטייט התחברות. */
+  const applyAuthSuccess = (token) => {
+    if (!token) {
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    }
+
+    apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+    setAuthToken(token);
+    setIsAuthenticated(true);
+    setShowAuthScreen(false);
+  };
+
+  /* חילוץ טוקן מתשובת Auth (תומך גם ב-response עם user+token). */
+  const extractTokenFromAuthResponse = (data) =>
+    data?.token || data?.data?.token || "";
+
+  /* שליחת התחברות/הרשמה לשרת ועדכון מצב מאומת באפליקציה. */
+  const submitAuthForm = async ({ onNavigate }) => {
+    const email = authEmail.trim();
+    const password = authPassword.trim();
+    const name = authName.trim();
+
+    if (!email || !password || (authMode === "register" && !name)) {
+      setAuthError("נא למלא את כל השדות הנדרשים");
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+    setAuthError("");
+
+    try {
+      /* הנתיב יחסי ל-baseURL שכבר כולל /api, לכן נשאר /auth/... */
+      const endpoint = authMode === "register" ? "/auth/register" : "/auth/login";
+      const payload =
+        authMode === "register"
+          ? { name, email, password }
+          : { email, password };
+
+      const response = await apiClient.post(endpoint, payload);
+      const token = extractTokenFromAuthResponse(response.data);
+      if (!token) {
+        setAuthError("לא התקבל טוקן מהשרת");
+        return;
+      }
+
+      applyAuthSuccess(token);
+      await fetchRoutesFromServer(token);
+      onNavigate("home");
+    } catch (error) {
+      console.error("Auth failed", error);
+      setAuthError("התחברות נכשלה. בדוק פרטים ונסה שוב");
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const toLatLngPoint = (point) => {
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return { lat, lng };
+  };
+
+  const normalizeRouteFromServer = (route, index) => {
+    const originPoint = toLatLngPoint(route?.start);
+    const destinationPoint = toLatLngPoint(route?.end);
+
+    return {
+      ...route,
+      id: route?._id || route?.id || `route-${Date.now()}-${index}`,
+      from: route?.start?.label || route?.from || "מוצא",
+      to: route?.end?.label || route?.to || "יעד",
+      etaMin: route?.etaMin ?? route?.etaMinutes ?? 0,
+      ...(originPoint ? { fromLatLng: originPoint, origin: originPoint } : {}),
+      ...(destinationPoint
+        ? { toLatLng: destinationPoint, destination: destinationPoint }
+        : {}),
+    };
+  };
+
+  /* טעינת מסלולים מהשרת לפי משתמש מחובר ושמירה ב-state של המסך. */
+  const fetchRoutesFromServer = async (tokenOverride) => {
+    const effectiveToken = tokenOverride || authToken;
+    if (!effectiveToken) {
+      return;
+    }
+
+    setIsRoutesLoading(true);
+    setRoutesLoadError("");
+
+    try {
+      const response = await apiClient.get("/routes", {
+        headers: { Authorization: `Bearer ${effectiveToken}` },
+      });
+
+      const serverRoutes = Array.isArray(response.data?.routes)
+        ? response.data.routes
+        : [];
+      setRoutes(serverRoutes.map(normalizeRouteFromServer));
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      console.error("Failed to load routes", error);
+      setRoutesLoadError("טעינת מסלולים נכשלה");
+    } finally {
+      setIsRoutesLoading(false);
+    }
+  };
+
+  /* הידרציה בטעינה: הגדרת Authorization לפני fetchRoutes ואז טעינת מסלולים. */
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
+    if (!storedToken) {
+      setIsAuthenticated(false);
+      setShowAuthScreen(true);
+      return;
+    }
+
+    applyAuthSuccess(storedToken);
+    fetchRoutesFromServer(storedToken);
+  }, []);
 
   const filterChips = ["הכל", "קצר", "בינוני", "ארוך", "שטח"];
 
@@ -1366,6 +1532,14 @@ function App() {
               בחר מסלול וצא לרכיבה
             </p>
 
+            {(isRoutesLoading || routesLoadError) && (
+              <p className="mt-2 text-xs text-slate-300">
+                {isRoutesLoading
+                  ? "טוען מסלולים מהשרת..."
+                  : routesLoadError}
+              </p>
+            )}
+
             {/* אקורדיון הוספת מסלול: ברירת מחדל סגור */}
             <div className="mv-card mt-4 rounded-2xl p-3">
               <button
@@ -1559,7 +1733,7 @@ function App() {
                 <Button
                   variant="ghost"
                   size="md"
-                  onClick={() => {
+                  onClick={async () => {
                     const title = newRouteTitle.trim();
                     const from = newOriginLabel.trim();
                     const to = newDestinationLabel.trim();
@@ -1568,36 +1742,57 @@ function App() {
                       return;
                     }
 
+                    if (!authToken) {
+                      setNewRouteLocationError("נדרש אימות משתמש לשמירה בשרת");
+                      return;
+                    }
+
+                    if (!newOriginLatLng || !newDestinationLatLng) {
+                      setNewRouteLocationError("לשמירה בשרת יש לבחור מוצא ויעד במפה");
+                      return;
+                    }
+
                     setNewRouteLocationError("");
 
-                    /* אובייקט מסלול חדש כולל labels + קואורדינטות לשימוש עתידי. */
-                    setRoutes((prev) => [
-                      {
-                        id: `route-${Date.now()}`,
-                        title,
-                        from,
-                        to,
-                        fromLabel: from,
-                        toLabel: to,
-                        ...(newOriginLatLng ? { fromLatLng: newOriginLatLng } : {}),
-                        ...(newDestinationLatLng
-                          ? { toLatLng: newDestinationLatLng }
-                          : {}),
-                        ...(newOriginLatLng ? { origin: newOriginLatLng } : {}),
-                        ...(newDestinationLatLng
-                          ? { destination: newDestinationLatLng }
-                          : {}),
-                        distanceKm: 28,
-                        etaMin: 35,
-                        routeType: newRouteType,
-                        difficulty: newRouteIsTwisty
-                          ? getAdjustedDifficultyForTwisty(newRouteDifficulty)
-                          : newRouteDifficulty,
-                        isTwisty: newRouteIsTwisty,
-                        tags: ["כביש", "מקומי"],
-                      },
-                      ...prev,
-                    ]);
+                    /* יצירת מסלול בשרת עם נקודות והמטא-דאטה של הטופס. */
+                    try {
+                      await apiClient.post(
+                        "/routes",
+                        {
+                          title,
+                          start: {
+                            lat: newOriginLatLng.lat,
+                            lng: newOriginLatLng.lng,
+                            label: from,
+                          },
+                          end: {
+                            lat: newDestinationLatLng.lat,
+                            lng: newDestinationLatLng.lng,
+                            label: to,
+                          },
+                          routeType: newRouteType,
+                          difficulty: newRouteIsTwisty
+                            ? getAdjustedDifficultyForTwisty(newRouteDifficulty)
+                            : newRouteDifficulty,
+                          isTwisty: newRouteIsTwisty,
+                        },
+                        {
+                          headers: { Authorization: `Bearer ${authToken}` },
+                        },
+                      );
+
+                      /* רענון רשימת מסלולים מהשרת אחרי יצירה מוצלחת. */
+                      await fetchRoutesFromServer(authToken);
+                    } catch (error) {
+                      if (error?.response?.status === 401) {
+                        handleUnauthorized();
+                        return;
+                      }
+
+                      console.error("Failed to create route", error);
+                      setNewRouteLocationError("שמירת מסלול נכשלה");
+                      return;
+                    }
 
                     setNewRouteTitle("");
                     setNewOriginLabel("");
@@ -1621,6 +1816,10 @@ function App() {
               <p className="mt-2 text-xs text-slate-400">
                 אפשר לשמור עם טקסט בלבד. לדיוק — לחץ "דייק במפה".
               </p>
+
+              {!!newRouteLocationError && (
+                <p className="mt-2 text-xs text-rose-300">{newRouteLocationError}</p>
+              )}
 
               {/* בחירה פשוטה מהמפה: לחיצה בודדת לשמירת מוצא/יעד */}
               {activeMapPickField && (
@@ -1649,7 +1848,7 @@ function App() {
                   ) : !isMapLoaded ? (
                     <p className="text-sm text-slate-200">טוען מפה...</p>
                   ) : (
-                    <div className="h-[320px] w-full overflow-hidden rounded-xl border border-white/10">
+                    <div className="h-80 w-full overflow-hidden rounded-xl border border-white/10">
                       <GoogleMap
                         center={mapPickCenter}
                         zoom={11}
@@ -2518,6 +2717,97 @@ function App() {
     </div>
   );
 
+  /* מסך אימות מינימלי: התחברות/הרשמה ושמירת טוקן לזרימת האפליקציה. */
+  const renderAuthScreen = ({ isRideActive, isRideMinimized, onNavigate }) => (
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+      <main className="mt-6 flex-1">
+        {renderActiveRideBanner({ isRideActive, isRideMinimized, onNavigate })}
+
+        <section>
+          <h1 className="text-3xl font-bold leading-tight sm:text-4xl">אימות משתמש</h1>
+          <p className="mt-2 text-base text-slate-300 sm:text-lg">
+            התחבר או הירשם כדי לעבוד עם מסלולים שמורים
+          </p>
+        </section>
+
+        <section className="mt-6">
+          <GlassCard
+            title="כניסה"
+            right={
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={authMode === "login" ? "primary" : "ghost"}
+                  size="md"
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthError("");
+                  }}
+                >
+                  התחברות
+                </Button>
+                <Button
+                  variant={authMode === "register" ? "primary" : "ghost"}
+                  size="md"
+                  onClick={() => {
+                    setAuthMode("register");
+                    setAuthError("");
+                  }}
+                >
+                  הרשמה
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-3">
+              {authMode === "register" && (
+                <input
+                  type="text"
+                  value={authName}
+                  onChange={(event) => setAuthName(event.target.value)}
+                  placeholder="שם מלא"
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                />
+              )}
+
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                placeholder="אימייל"
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              />
+
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder="סיסמה"
+                className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              />
+
+              {!!authError && <p className="text-xs text-rose-300">{authError}</p>}
+
+              {/* פעולת שליחה למסלול auth המתאים לפי מצב הטופס. */}
+              <div className="flex justify-end">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => submitAuthForm({ onNavigate })}
+                >
+                  {isAuthSubmitting
+                    ? "שולח..."
+                    : authMode === "register"
+                      ? "צור חשבון"
+                      : "התחבר"}
+                </Button>
+              </div>
+            </div>
+          </GlassCard>
+        </section>
+      </main>
+    </div>
+  );
+
   return (
     <AppShell>
       {({
@@ -2531,6 +2821,11 @@ function App() {
         rideElapsedSeconds,
         onNavigate,
       }) => {
+        /* מצב אורח: מציגים מסך אימות מינימלי עד קבלת טוקן. */
+        if (showAuthScreen || !isAuthenticated) {
+          return renderAuthScreen({ isRideActive, isRideMinimized, onNavigate });
+        }
+
         /* מסלול מוצג רק אם התחלנו רכיבה מתוך מסלולים; מעבר רגיל ל-Ride מנקה מסלול. */
         const navigateTo = (tabKey, options = { source: "other" }) => {
           const source = options?.source ?? "other";

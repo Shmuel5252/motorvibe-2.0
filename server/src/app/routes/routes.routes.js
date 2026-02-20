@@ -15,6 +15,10 @@ router.use(authMiddleware);
 router.post('/',
     [
     body('title').isString().trim().isLength({ min: 2, max: 80 }),
+    // מטא-דאטה למסלול (UI)
+    body('routeType').optional().isIn(['עירוני', 'בין־עירוני', 'שטח', 'נוף']),
+    body('difficulty').optional().isIn(['קל', 'בינוני', 'קשה']),
+    body('isTwisty').optional().isBoolean(),
     ...pointValidator('start'),
     ...pointValidator('end'),
     ],
@@ -49,6 +53,10 @@ router.patch('/:id',
         body("end.lat").optional().isFloat({ min: -90, max: 90 }),
         body("end.lng").optional().isFloat({ min: -180, max: 180 }),
         body("end.label").optional().isString().trim().isLength({ max: 80 }),
+        // מטא-דאטה למסלול (UI)
+        body('routeType').optional().isIn(['עירוני', 'בין־עירוני', 'שטח', 'נוף']),
+        body('difficulty').optional().isIn(['קל', 'בינוני', 'קשה']),
+        body('isTwisty').optional().isBoolean(),
     ],
     routesController.updateMyRoute
 );

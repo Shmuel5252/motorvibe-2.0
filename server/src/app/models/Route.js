@@ -19,6 +19,21 @@ const routeSchema = new mongoose.Schema(
 
         title: { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
 
+        // סוג המסלול לתצוגה וסינון באפליקציה
+        routeType: {
+            type: String,
+            enum: ['עירוני', 'בין־עירוני', 'שטח', 'נוף'],
+            default: 'עירוני',
+        },
+        // רמת הקושי של המסלול לרוכב
+        difficulty: {
+            type: String,
+            enum: ['קל', 'בינוני', 'קשה'],
+            default: 'בינוני',
+        },
+        // האם המסלול כולל כבישים מפותלים
+        isTwisty: { type: Boolean, default: false },
+
         start: { type: pointSchema, required: true },
         end: { type: pointSchema, required: true },
 
