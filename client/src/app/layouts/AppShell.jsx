@@ -33,7 +33,7 @@ const NAV_ITEMS = [
  * - תוכן העמוד הפעיל או פונקציית render prop עם מצב ניווט ורכיבה פעילה.
  * @returns {JSX.Element} שלד ניווט מלא עם תמיכה ב־RTL.
  */
-function AppShell({ children, onLogout }) {
+function AppShell({ children, onLogout, isAuthenticated = false }) {
   const [activeTab, setActiveTab] = useState("home");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -119,6 +119,8 @@ function AppShell({ children, onLogout }) {
           activeTab={activeTab}
           onNavigate={onNavigate}
           onMenuClick={() => setIsDrawerOpen(true)}
+          onLogout={onLogout}
+          isAuthenticated={isAuthenticated}
         />
       )}
 

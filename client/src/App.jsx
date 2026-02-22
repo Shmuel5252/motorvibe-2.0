@@ -2887,7 +2887,7 @@ function App() {
   );
 
   return (
-    <AppShell onLogout={handleLogout}>
+    <AppShell onLogout={handleLogout} isAuthenticated={isAuthenticated}>
       {({
         activeTab,
         isRideActive,
