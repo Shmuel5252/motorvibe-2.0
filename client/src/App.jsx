@@ -544,6 +544,38 @@ function App() {
     },
   ];
 
+  const recentRoutes = useMemo(() => {
+    if (!Array.isArray(routes) || routes.length === 0) {
+      return [];
+    }
+
+    const hasCreatedAt = routes.some((route) => Boolean(route?.createdAt));
+    const sourceRoutes = [...routes];
+
+    if (hasCreatedAt) {
+      sourceRoutes.sort((a, b) => {
+        const aTimestamp = Date.parse(a?.createdAt || "");
+        const bTimestamp = Date.parse(b?.createdAt || "");
+
+        if (Number.isNaN(aTimestamp) && Number.isNaN(bTimestamp)) {
+          return 0;
+        }
+
+        if (Number.isNaN(aTimestamp)) {
+          return 1;
+        }
+
+        if (Number.isNaN(bTimestamp)) {
+          return -1;
+        }
+
+        return bTimestamp - aTimestamp;
+      });
+    }
+
+    return sourceRoutes.slice(0, 3);
+  }, [routes]);
+
   /**
    * מחזיר קטגוריית אורך למסלול לפי מרחק ק"מ.
    * @param {number} distanceKm - מרחק המסלול בקילומטרים.
@@ -1207,7 +1239,6 @@ function App() {
     onNavigate,
   }) => (
     <div className="mx-auto flex w-full max-w-6xl flex-col pb-10 pt-5 text-slate-100">
-      
       {/* תמונת רגע רקע לכל הדף */}
       <div className="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-[#020617]">
         <img
@@ -1270,26 +1301,49 @@ function App() {
 
         {/* כרטיסי מידע מרכזיים */}
         <section className="mt-12 grid grid-cols-1 gap-5 lg:mt-20 lg:grid-cols-2">
+          {/* מסלולים אחרונים: מציג עד 3 מסלולים אמיתיים מה-state. */}
           <GlassCard
             title="מסלולים אחרונים"
             right={
+              /* מעבר למסך מסלולים המלא מתוך דף הבית. */
               <button
                 type="button"
+                onClick={() => onNavigate("routes")}
                 className="text-xs text-emerald-300 hover:text-emerald-200"
               >
                 ראה הכל
               </button>
             }
           >
-            <div className="space-y-3">
-              <div className="h-28 rounded-xl bg-slate-900/80 ring-1 ring-white/10" />
-              <div>
-                <h3 className="text-sm font-semibold text-slate-100">
-                  רמת השרון למסילת איילון
-                </h3>
-                <p className="mt-1 text-xs text-slate-400">42 ק״מ • 45 דק׳</p>
+            {recentRoutes.length === 0 ? (
+              <div className="space-y-1 py-3">
+                <p className="text-sm font-semibold text-slate-100">
+                  אין עדיין מסלולים
+                </p>
+                <p className="text-xs text-slate-400">
+                  צור מסלול ראשון במסך מסלולים
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {recentRoutes.map((route) => (
+                  <div
+                    key={route.id}
+                    className="rounded-xl bg-slate-900/40 px-3 py-2 ring-1 ring-white/10"
+                  >
+                    <h3 className="text-sm font-semibold text-slate-100">
+                      {route.title}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {route.from} → {route.to}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-300">
+                      {route.distanceKm} ק״מ • {route.etaMin} דק׳
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </GlassCard>
 
           <GlassCard
