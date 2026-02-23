@@ -318,41 +318,103 @@ export default function RidePage({
 
   const [startError, setStartError] = useState("");
   const [stopError, setStopError] = useState("");
+  /* מזהה הרכיבה האחרונה שנעצרה — לשמירת שם */
+  const [lastRideId, setLastRideId] = useState(null);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [rideName, setRideName] = useState("");
 
   if (isRideActive && !isRideMinimized) {
     /* סיום רכיבה: עצירה בשרת, רענון היסטוריה, ניווט */
     const handleFinish = async () => {
       setStopError("");
       try {
-        await apiClient.post("/rides/stop");
-        await fetchHistoryFromServer();
-        setIsRideActive(false);
-        setIsRidePaused(false);
-        setDidStartFromRoute(false);
-        setIsRideMinimized(false);
-        onNavigate("history");
+        const res = await apiClient.post("/rides/stop");
+        /* שמירת מזהה לצורך עדכון שם בפעולה הבאה */
+        setLastRideId(res?.data?.ride?._id || null);
+        setRideName("");
+        setShowNameModal(true);
+        /* הקפאת הטיימר בזמן שהמודל פתוח — הניקוי יבוצע בלחיצה */
+        setIsRidePaused(true);
       } catch {
         setStopError("שגיאה בסיום הרכיבה.");
       }
     };
 
     return (
-      <RideActiveHud
-        rideElapsedSeconds={rideElapsedSeconds}
-        isRidePaused={isRidePaused}
-        setIsRidePaused={setIsRidePaused}
-        selectedRoute={rideSelectedRoute}
-        mapApiKey={mapApiKey}
-        isMapLoaded={isMapLoaded}
-        mapLoadError={mapLoadError}
-        stopError={stopError}
-        onMinimize={() => {
-          setIsRideMinimized(true);
-          onNavigate("home");
-        }}
-        onFinish={handleFinish}
-      />
+      <>
+        <RideActiveHud
+          rideElapsedSeconds={rideElapsedSeconds}
+          isRidePaused={isRidePaused}
+          setIsRidePaused={setIsRidePaused}
+          selectedRoute={rideSelectedRoute}
+          mapApiKey={mapApiKey}
+          isMapLoaded={isMapLoaded}
+          mapLoadError={mapLoadError}
+          stopError={stopError}
+          onMinimize={() => {
+            setIsRideMinimized(true);
+            onNavigate("home");
+          }}
+          onFinish={handleFinish}
+        />
+
+        {/* מודל שמירת שם רכיבה לאחר עצירה */}
+        {showNameModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 shadow-xl">
+              <p className="text-base font-semibold text-slate-100">שם לרכיבה שלך</p>
+              <input
+                type="text"
+                value={rideName}
+                onChange={(e) => setRideName(e.target.value)}
+                placeholder="למשל: טיול ערב לחוף"
+                maxLength={60}
+                className="mt-3 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              />
+              <div className="mt-4 flex gap-2">
+                {/* שמירת שם רכיבה בשרת */}
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-semibold text-white hover:bg-emerald-400"
+                  onClick={async () => {
+                    setShowNameModal(false);
+                    setIsRideActive(false);
+                    setDidStartFromRoute(false);
+                    if (lastRideId && rideName.trim()) {
+                      try {
+                        await apiClient.patch(`/rides/${lastRideId}`, { name: rideName.trim() });
+                      } catch (err) {
+                        console.error("Failed to save ride name:", err);
+                      }
+                    }
+                    /* רענון היסטוריה לאחר שמירה */
+                    await fetchHistoryFromServer();
+                    onNavigate("history");
+                  }}
+                >
+                  שמור
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-slate-300 hover:text-white"
+                  onClick={async () => {
+                    setShowNameModal(false);
+                    setIsRideActive(false);
+                    setDidStartFromRoute(false);
+                    await fetchHistoryFromServer();
+                    onNavigate("history");
+                  }}
+                >
+                  דלג
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
+
   }
 
   return (

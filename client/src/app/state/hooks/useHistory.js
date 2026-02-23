@@ -38,10 +38,9 @@ function formatDate(dateInput) {
  * @returns {{ id: string, title: string, date: string, duration: string, distance: string }}
  */
 function mapRideToUIShape(ride) {
-  /* כותרת: שם מפורש > snapshot > ברירת מחדל */
+  /* כותרת: שם שנשמר > snapshot > ברירת מחדל */
   const title =
     ride.name ||
-    ride.title ||
     ride.routeSnapshot?.title ||
     "רכיבה";
 

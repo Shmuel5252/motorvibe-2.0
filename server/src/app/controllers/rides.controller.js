@@ -114,9 +114,37 @@ async function getRideHistory(req, res) {
     return res.status(200).json({ rides });
 }
 
+/* עדכון שם רכיבה לפי מזהה */
+async function updateRide(req, res) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            error: { code: "VALIDATION_ERROR", details: errors.array() }
+        });
+    }
+
+    const owner = req.user.userId;
+    const { id } = req.params;
+    const { name } = req.body;
+
+    const ride = await Ride.findOne({ _id: id, owner });
+    if (!ride) {
+        return notFound(res);
+    }
+
+    /* עדכון השם אם סופק */
+    if (name) {
+        ride.name = name.trim();
+    }
+
+    await ride.save();
+    return res.status(200).json({ ride });
+}
+
 module.exports = {
     startRide,
     stopRide,
     getActiveRide,
     getRideHistory,
+    updateRide,
 };

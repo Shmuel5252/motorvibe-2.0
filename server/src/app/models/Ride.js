@@ -9,6 +9,7 @@ const rideSchema = new mongoose.Schema(
             index: true
         },
         route: { type: mongoose.Schema.Types.ObjectId, ref: 'Route', required: false, default: null },
+        name: { type: String, default: "" },
 
         routeSnapshot: {
             title: String,
