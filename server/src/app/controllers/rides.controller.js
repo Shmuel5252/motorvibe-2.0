@@ -141,10 +141,25 @@ async function updateRide(req, res) {
     return res.status(200).json({ ride });
 }
 
+/* מחיקת רכיבה לפי מזהה */
+async function deleteRide(req, res) {
+    const { id } = req.params;
+    const owner = req.user.userId;
+
+    const ride = await Ride.findOne({ _id: id, owner });
+    if (!ride) {
+        return notFound(res);
+    }
+
+    await ride.deleteOne();
+    return res.status(200).json({ ok: true });
+}
+
 module.exports = {
     startRide,
     stopRide,
     getActiveRide,
     getRideHistory,
     updateRide,
+    deleteRide,
 };

@@ -3,6 +3,7 @@
  * רכיב Stateless: מקבל את כל הנתונים וה-Handlers כ-Props מ-App.jsx.
  */
 
+import { useState } from "react";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 
@@ -58,7 +59,26 @@ export default function HistoryPage({
   setHistoryRideNotes,
   searchQuery,
   setSearchQuery,
+  apiClient,
+  fetchHistoryFromServer,
 }) {
+  /* שם לעריכה במודל הפרטים */
+  const [editName, setEditName] = useState("");
+  /* שגיאה מקומית במודל */
+  const [modalError, setModalError] = useState("");
+
+  /* אתחול editName כשנפתחת רכיבה חדשה */
+  const openRide = (ride) => {
+    setEditName(ride.name || ride.title || "");
+    setModalError("");
+    setSelectedHistoryRide(ride);
+  };
+
+  const closeModal = () => {
+    setSelectedHistoryRide(null);
+    setModalError("");
+  };
+
   /* סינון מקומי פשוט לפי שם רכיבה (case-insensitive). */
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const visibleHistoryRides = historyRides.filter((ride) =>
@@ -205,7 +225,7 @@ export default function HistoryPage({
                   variant="ghost"
                   size="md"
                   className="h-8 w-8 rounded-full p-0 text-base"
-                  onClick={() => setSelectedHistoryRide(ride)}
+                  onClick={() => openRide(ride)}
                 >
                   &gt;
                 </Button>
@@ -236,7 +256,7 @@ export default function HistoryPage({
             <button
               type="button"
               className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
-              onClick={() => setSelectedHistoryRide(null)}
+              onClick={closeModal}
               aria-label="סגור פרטי רכיבה"
             />
 
@@ -275,42 +295,71 @@ export default function HistoryPage({
                   </div>
                 </div>
 
-                {/* סיכום רכיבה: שדות placeholder עד חיבור לנתונים אמיתיים */}
+                {/* שדה עריכת שם רכיבה */}
                 <div className="mv-card mt-4 rounded-xl px-3 py-3">
-                  <p className="text-sm font-semibold text-slate-100">
-                    סיכום רכיבה
-                  </p>
-                  <div className="mt-2 space-y-1.5 text-sm text-slate-300">
-                    <p>מהירות ממוצעת: —</p>
-                    <p>דופק ממוצע: —</p>
-                    <p>מזג אוויר: —</p>
-                  </div>
-                </div>
-
-                {/* הערות מקומיות: טקסט חופשי ללא שמירה בשרת */}
-                <div className="mv-card mt-4 rounded-xl px-3 py-3">
-                  <p className="text-sm font-semibold text-slate-100">הערות</p>
-                  <textarea
-                    value={historyRideNotes}
-                    onChange={(event) =>
-                      setHistoryRideNotes(event.target.value)
-                    }
-                    placeholder="הוסף הערה קצרה על הרכיבה..."
-                    className="mt-2 h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  <p className="text-sm font-semibold text-slate-100">ערוך שם</p>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    maxLength={60}
+                    placeholder="שם לרכיבה..."
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   />
                 </div>
 
+                {/* שגיאה inline */}
+                {modalError && (
+                  <p className="mt-2 text-xs text-rose-300">{modalError}</p>
+                )}
+
                 {/* שורת פעולות תחתונה */}
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <Button variant="primary" size="md" onClick={() => {}}>
-                    שמור כמסלול
+                  {/* שמירת שם רכיבה בשרת */}
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={async () => {
+                      setModalError("");
+                      const rideId = selectedHistoryRide._id || selectedHistoryRide.id;
+                      try {
+                        await apiClient.patch(`/rides/${rideId}`, { name: editName.trim() });
+                        await fetchHistoryFromServer();
+                        closeModal();
+                      } catch (err) {
+                        console.error("PATCH ride error:", err?.response?.status, err?.message);
+                        setModalError("שגיאה בשמירה");
+                      }
+                    }}
+                  >
+                    שמור
                   </Button>
+
+                  {/* מחיקת רכיבה */}
                   <Button
                     variant="ghost"
                     size="md"
-                    onClick={() => setSelectedHistoryRide(null)}
+                    className="border-rose-300/30 text-rose-300 hover:text-rose-200"
+                    onClick={async () => {
+                      if (!window.confirm("האם אתה בטוח שברצונך למחוק רכיבה זו?")) return;
+                      setModalError("");
+                      const rideId = selectedHistoryRide._id || selectedHistoryRide.id;
+                      try {
+                        await apiClient.delete(`/rides/${rideId}`);
+                        await fetchHistoryFromServer();
+                        closeModal();
+                      } catch (err) {
+                        console.error("DELETE ride error:", err?.response?.status, err?.message);
+                        setModalError("שגיאה במחיקה");
+                      }
+                    }}
                   >
-                    חזרה להיסטוריה
+                    מחק רכיבה
+                  </Button>
+
+                  {/* סגירת המודל */}
+                  <Button variant="ghost" size="md" onClick={closeModal}>
+                    סגור
                   </Button>
                 </div>
               </GlassCard>

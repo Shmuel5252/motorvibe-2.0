@@ -270,6 +270,8 @@ function App() {
                 setHistoryRideNotes={state.setHistoryRideNotes}
                 searchQuery={state.searchQuery}
                 setSearchQuery={state.setSearchQuery}
+                apiClient={state.apiClient}
+                fetchHistoryFromServer={state.fetchHistoryFromServer}
               />
             </>
           );

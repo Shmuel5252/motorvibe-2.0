@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 
 const authMiddleware = require('../middlewares/auth.middleware');
-const { startRide, stopRide, getActiveRide, getRideHistory, updateRide } = require('../controllers/rides.controller');
+const { startRide, stopRide, getActiveRide, getRideHistory, updateRide, deleteRide } = require('../controllers/rides.controller');
 
 router.use(authMiddleware);
 
@@ -22,5 +22,7 @@ router.patch(
     body('name').optional({ checkFalsy: true }).isString().trim().isLength({ max: 60 }),
     updateRide
 );
+
+router.delete('/:id', deleteRide);
 
 module.exports = router;
