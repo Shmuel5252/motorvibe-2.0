@@ -5,6 +5,7 @@
 
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
+import { formatRideDuration } from "../app/utils/formatters";
 
 /**
  * באנר רכיבה פעילה לטאבים שאינם מסך הרכיבה.
@@ -180,20 +181,14 @@ export default function HomePage({
         const totalKm = historyRides.reduce((sum, r) => sum + (r.rawKm || 0), 0);
         const totalSeconds = historyRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
 
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const formattedTime = hours > 0
-          ? `${hours}:${String(minutes).padStart(2, "0")}`
-          : `0:${String(minutes).padStart(2, "0")}`;
-
         return (
           <section className="mv-pill mx-4 mt-6 px-4 py-3 sm:mx-6">
             <div className="flex items-center justify-between gap-2 text-sm text-slate-200">
               <span>{totalRides} רכיבות</span>
               <span className="text-white/30">|</span>
-              <span>{formattedTime} שעות</span>
+              <span>{totalSeconds > 0 ? formatRideDuration(totalSeconds) : "--"}</span>
               <span className="text-white/30">|</span>
-              <span>{parseFloat(totalKm.toFixed(1))} ק״מ</span>
+              <span>{totalKm > 0 ? parseFloat(totalKm.toFixed(1)) : "--"} ק״מ</span>
             </div>
           </section>
         );

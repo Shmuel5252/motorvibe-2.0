@@ -11,6 +11,7 @@ import {
 } from "@react-google-maps/api";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
+import { formatRideDuration } from "../app/utils/formatters";
 
 /* ─── סגנון מפה כהה (Dark Map Style) ─── */
 const DARK_MAP_STYLE = [
@@ -329,26 +330,20 @@ export default function HistoryPage({
           const totalKm = visibleHistoryRides.reduce((sum, r) => sum + (r.rawKm || 0), 0);
           const totalSeconds = visibleHistoryRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
 
-          const hours = Math.floor(totalSeconds / 3600);
-          const minutes = Math.floor((totalSeconds % 3600) / 60);
-          const formattedTime = hours > 0
-            ? `${hours}:${String(minutes).padStart(2, "0")}`
-            : `0:${String(minutes).padStart(2, "0")}`;
-
           return (
             <section className="mv-card mt-6 px-4 py-3">
-              <div className="grid grid-cols-3 gap-0 text-center">
+              <div className="grid grid-cols-3 gap-0 text-center items-center">
                 <div className="border-e border-white/10 px-2">
                   <p className="text-2xl font-semibold leading-none text-white">
                     {totalRides}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">רכיבות</p>
                 </div>
-                <div className="border-e border-white/10 px-2">
-                  <p className="text-2xl font-semibold leading-none text-white">
-                    {formattedTime}
+                <div className="border-e border-white/10 px-0 flex flex-col justify-center min-h-[44px]">
+                  <p className="text-sm sm:text-base font-semibold leading-tight text-white drop-shadow-sm">
+                    {formatRideDuration(totalSeconds)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">שעות</p>
+                  <p className="mt-1 text-[10px] sm:text-xs text-slate-400">זמן כולל</p>
                 </div>
                 <div className="px-2">
                   <p className="text-2xl font-semibold leading-none text-white">

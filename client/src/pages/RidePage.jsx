@@ -277,7 +277,7 @@ function RideActiveHud({
                 ⏱️
               </span>
               <span className="text-xl font-semibold leading-none text-white">
-                {currentSpeedKmh > 0 ? currentSpeedKmh : "--"}
+                {currentSpeedKmh > 0 ? currentSpeedKmh : "0"}
               </span>
               <span className="text-[10px] text-slate-400">מהירות (קמ״ש)</span>
             </div>
@@ -288,7 +288,7 @@ function RideActiveHud({
                 📍
               </span>
               <span className="text-xl font-semibold leading-none text-white">
-                {totalDistanceKm > 0 ? totalDistanceKm.toFixed(1) : "--"}
+                {totalDistanceKm > 0 ? totalDistanceKm.toFixed(1) : "0.0"}
               </span>
               <span className="text-[10px] text-slate-400">מרחק (ק״מ)</span>
             </div>
