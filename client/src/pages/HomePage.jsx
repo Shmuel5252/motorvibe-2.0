@@ -40,6 +40,7 @@ function ActiveRideBanner({ isRideActive, isRideMinimized, onNavigate }) {
  */
 export default function HomePage({
   currentUser,
+  historyRides = [],
   recentRoutes,
   isRideActive,
   isRideMinimized,
@@ -174,16 +175,29 @@ export default function HomePage({
       </main>
 
       {/* פס סטטיסטיקות תחתון */}
-      {/* ערכי placeholder — יוחלפו בסטטיסטיקות אמיתיות מהשרת */}
-      <section className="mv-pill mx-4 mt-6 px-4 py-3 sm:mx-6">
-        <div className="flex items-center justify-between gap-2 text-sm text-slate-200">
-          <span>-- רכיבות</span>
-          <span className="text-white/30">|</span>
-          <span>-- שעות</span>
-          <span className="text-white/30">|</span>
-          <span>-- ק״מ</span>
-        </div>
-      </section>
+      {(() => {
+        const totalRides = historyRides.length;
+        const totalKm = historyRides.reduce((sum, r) => sum + (r.rawKm || 0), 0);
+        const totalSeconds = historyRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
+
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const formattedTime = hours > 0
+          ? `${hours}:${String(minutes).padStart(2, "0")}`
+          : `0:${String(minutes).padStart(2, "0")}`;
+
+        return (
+          <section className="mv-pill mx-4 mt-6 px-4 py-3 sm:mx-6">
+            <div className="flex items-center justify-between gap-2 text-sm text-slate-200">
+              <span>{totalRides} רכיבות</span>
+              <span className="text-white/30">|</span>
+              <span>{formattedTime} שעות</span>
+              <span className="text-white/30">|</span>
+              <span>{parseFloat(totalKm.toFixed(1))} ק״מ</span>
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }

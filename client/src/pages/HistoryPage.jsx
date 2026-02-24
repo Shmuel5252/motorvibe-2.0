@@ -54,13 +54,23 @@ function RideHistoryMap({ points, isMapLoaded, mapLoadError }) {
   /* התאמת תצוגה (fitBounds) למסלול לאחר טעינת המפה */
   useEffect(() => {
     if (!mapInstance || !window.google || points.length < 2) return;
-    try {
-      const bounds = new window.google.maps.LatLngBounds();
-      points.forEach((p) => bounds.extend(p));
-      mapInstance.fitBounds(bounds, /* padding */ 30);
-    } catch {
-      /* no-op: לא מפילים UI */
-    }
+
+    /* מונע במכוון ריצת fitBounds במקביל ל-mount של המודל כשגובהו 0 */
+    const timer = setTimeout(() => {
+      try {
+        const bounds = new window.google.maps.LatLngBounds();
+        points.forEach((p) => {
+          if (p && typeof p.lat === "number" && typeof p.lng === "number") {
+            bounds.extend(p);
+          }
+        });
+        mapInstance.fitBounds(bounds, /* padding */ 30);
+      } catch (err) {
+        console.warn("fitBounds error:", err);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [mapInstance, points]);
 
   if (mapLoadError) {
@@ -86,7 +96,7 @@ function RideHistoryMap({ points, isMapLoaded, mapLoadError }) {
       center={points[0] ?? { lat: 31.5, lng: 34.75 }}
       zoom={12}
       onLoad={(map) => setMapInstance(map)}
-      mapContainerClassName="h-full w-full"
+      mapContainerStyle={{ width: "100%", height: "100%" }}
       options={{
         styles: DARK_MAP_STYLE,
         disableDefaultUI: true,
@@ -314,28 +324,42 @@ export default function HistoryPage({
         </section>
 
         {/* פס סטטיסטיקות: מספרים גדולים ומחיצות אנכיות עדינות */}
-        <section className="mv-card mt-6 px-4 py-3">
-          <div className="grid grid-cols-3 gap-0 text-center">
-            <div className="border-e border-white/10 px-2">
-              <p className="text-2xl font-semibold leading-none text-white">
-                12
-              </p>
-              <p className="mt-1 text-xs text-slate-400">רכיבות</p>
-            </div>
-            <div className="border-e border-white/10 px-2">
-              <p className="text-2xl font-semibold leading-none text-white">
-                14:30
-              </p>
-              <p className="mt-1 text-xs text-slate-400">שעות</p>
-            </div>
-            <div className="px-2">
-              <p className="text-2xl font-semibold leading-none text-white">
-                615
-              </p>
-              <p className="mt-1 text-xs text-slate-400">ק״מ</p>
-            </div>
-          </div>
-        </section>
+        {(() => {
+          const totalRides = visibleHistoryRides.length;
+          const totalKm = visibleHistoryRides.reduce((sum, r) => sum + (r.rawKm || 0), 0);
+          const totalSeconds = visibleHistoryRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
+
+          const hours = Math.floor(totalSeconds / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+          const formattedTime = hours > 0
+            ? `${hours}:${String(minutes).padStart(2, "0")}`
+            : `0:${String(minutes).padStart(2, "0")}`;
+
+          return (
+            <section className="mv-card mt-6 px-4 py-3">
+              <div className="grid grid-cols-3 gap-0 text-center">
+                <div className="border-e border-white/10 px-2">
+                  <p className="text-2xl font-semibold leading-none text-white">
+                    {totalRides}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">רכיבות</p>
+                </div>
+                <div className="border-e border-white/10 px-2">
+                  <p className="text-2xl font-semibold leading-none text-white">
+                    {formattedTime}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">שעות</p>
+                </div>
+                <div className="px-2">
+                  <p className="text-2xl font-semibold leading-none text-white">
+                    {parseFloat(totalKm.toFixed(1))}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">ק״מ</p>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* רשימת רכיבות אחרונות */}
         <section className="mt-6 space-y-4">

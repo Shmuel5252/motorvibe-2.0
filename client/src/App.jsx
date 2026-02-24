@@ -160,6 +160,7 @@ function App() {
               {bikeTabLoader}
               <HomePage
                 currentUser={state.currentUser}
+                historyRides={state.historyRides}
                 recentRoutes={state.recentRoutes}
                 isRideActive={isRideActive}
                 isRideMinimized={isRideMinimized}

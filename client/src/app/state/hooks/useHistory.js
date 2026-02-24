@@ -53,8 +53,8 @@ function calculatePathDistance(path) {
     const a =
       Math.sin(dLat / 2) ** 2 +
       Math.cos((prev.lat * Math.PI) / 180) *
-        Math.cos((curr.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
+      Math.cos((curr.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
     total += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
   return total;
@@ -80,8 +80,8 @@ function mapRideToUIShape(ride) {
     ride.durationSeconds ||
     (ride.endedAt && ride.startedAt
       ? Math.max(0, Math.floor(
-          (new Date(ride.endedAt) - new Date(ride.startedAt)) / 1000
-        ))
+        (new Date(ride.endedAt) - new Date(ride.startedAt)) / 1000
+      ))
       : 0);
   const duration = formatDuration(rawSeconds);
 
@@ -100,6 +100,8 @@ function mapRideToUIShape(ride) {
     date,
     duration,
     distance,
+    rawSeconds,
+    rawKm,
     /* snapshot מסלול — לשימוש המרה למסלול קבוע */
     routeSnapshot: ride.routeSnapshot || null,
     /* מסמך גולמי מהשרת — גישה ל-path ושדות נוספים */

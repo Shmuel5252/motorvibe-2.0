@@ -187,17 +187,17 @@ function RideActiveHud({
   const seconds = String(rideElapsedSeconds % 60).padStart(2, "0");
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-4 pb-6 pt-6 sm:px-6">
+    <section className="relative h-[100dvh] flex flex-col overflow-hidden px-4 pb-4 pt-6 sm:px-6">
       {/* שכבת רקע קולנועית + גריד עדין לדימוי מפה */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(20,184,166,0.22),rgba(2,6,23,0.9)_38%,rgba(2,6,23,1)_78%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[26px_26px] opacity-35" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_78%,rgba(16,185,129,0.14),transparent_52%)]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col justify-between">
-        {/* טיימר מרכזי */}
-        <div className="pt-10 text-center sm:pt-14">
+      <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col">
+        {/* טיימר מרכזי - גובה קבוע */}
+        <div className="flex-none pt-2 text-center sm:pt-6">
           {/* פעולת מזעור: מחזירה למעטפת רגילה בלי לסיים רכיבה */}
-          <div className="mb-5 flex items-center justify-end">
+          <div className="mb-2 flex items-center justify-end">
             <Button
               variant="ghost"
               size="md"
@@ -213,22 +213,22 @@ function RideActiveHud({
           </p>
 
           {/* אינדיקציה למסלול פעיל גם בזמן HUD במסך מלא */}
-          <div className="mx-auto mt-4 max-w-md rounded-xl border border-white/10 bg-slate-900/45 px-3 py-2 text-sm">
-            <p className="text-slate-200">
-              מסלול נבחר: {selectedRoute ? selectedRoute.title : "ללא"}
-            </p>
-            {selectedRoute && (
+          {selectedRoute && (
+            <div className="mx-auto mt-3 max-w-md rounded-xl border border-white/10 bg-slate-900/45 px-3 py-2 text-sm">
+              <p className="text-slate-200">
+                מסלול נבחר: {selectedRoute.title}
+              </p>
               <p className="mt-1 text-xs text-slate-400">
                 {selectedRoute.from} → {selectedRoute.to}
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* UI מפה: כרטיס ייעודי תחת הטיימר עם תמיכת fallback למפתח חסר. */}
-        <div className="mx-auto mt-6 w-full max-w-4xl">
-          <div className="mv-card overflow-hidden rounded-2xl border border-white/10">
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+        {/* UI מפה: תופס את שאר המקום (flex-1 min-h-0) */}
+        <div className="mx-auto mt-4 w-full max-w-4xl flex-1 flex flex-col min-h-0 pb-4">
+          <div className="mv-card flex h-full flex-col overflow-hidden rounded-2xl border border-white/10">
+            <div className="flex-none flex items-center justify-between border-b border-white/10 px-3 py-2">
               <span className="text-xs text-slate-200">מפת רכיבה</span>
               {isGpsUnavailable && (
                 <span className="mv-pill px-2.5 py-1 text-xs text-amber-200">
@@ -237,7 +237,7 @@ function RideActiveHud({
               )}
             </div>
 
-            <div className="relative h-56 sm:h-64 md:h-72">
+            <div className="relative flex-1 min-h-0">
               {!hasGoogleMapsApiKey ? (
                 <div className="flex h-full items-center justify-center bg-slate-900/60 px-4 text-sm text-slate-200">
                   חסר מפתח Google Maps
@@ -257,77 +257,79 @@ function RideActiveHud({
 
         {/* KPI צף בסגנון נקי: 3 עמודות עם אייקון, ערך גדול ותווית קטנה */}
         {/* ערכי placeholder — יוחלפו בנתוני GPS ומחשוב אמיתיים */}
-        <div className="mx-auto mt-8 w-full max-w-3xl border-y border-white/10 py-5">
+        <div className="flex-none mx-auto mt-4 w-full max-w-3xl border-t border-white/10 pt-4">
           {/* סדר עמודות לוגי: דיוק → מהירות → מרחק */}
           <div className="grid grid-cols-3 gap-3 text-center">
             {/* דיוק GPS באחוזים */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+            <div className="flex flex-col items-center gap-1">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
                 🧭
               </span>
-              <span className="text-2xl font-semibold leading-none text-white">
+              <span className="text-xl font-semibold leading-none text-white">
                 {gpsAccuracyPct !== null ? `${gpsAccuracyPct}%` : "--"}
               </span>
-              <span className="text-xs text-slate-400">דיוק</span>
+              <span className="text-[10px] text-slate-400">דיוק</span>
             </div>
 
             {/* מהירות נוכחית בקמ"ש */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+            <div className="flex flex-col items-center gap-1">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
                 ⏱️
               </span>
-              <span className="text-2xl font-semibold leading-none text-white">
+              <span className="text-xl font-semibold leading-none text-white">
                 {currentSpeedKmh > 0 ? currentSpeedKmh : "--"}
               </span>
-              <span className="text-xs text-slate-400">מהירות (קמ״ש)</span>
+              <span className="text-[10px] text-slate-400">מהירות (קמ״ש)</span>
             </div>
 
             {/* מרחק מצטבר בק"מ */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
+            <div className="flex flex-col items-center gap-1">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
                 📍
               </span>
-              <span className="text-2xl font-semibold leading-none text-white">
+              <span className="text-xl font-semibold leading-none text-white">
                 {totalDistanceKm > 0 ? totalDistanceKm.toFixed(1) : "--"}
               </span>
-              <span className="text-xs text-slate-400">מרחק (ק״מ)</span>
+              <span className="text-[10px] text-slate-400">מרחק (ק״מ)</span>
             </div>
           </div>
         </div>
 
         {/* סרגל פעולות תחתון */}
-        {/* הצגת שגיאת סיום רכיבה — inline מעל הכפתורים */}
-        {stopError && (
-          <p className="mx-auto mt-6 text-center text-xs text-rose-300">{stopError}</p>
-        )}
+        <div className="flex-none mx-auto w-full max-w-xl pb-2">
+          {/* הצגת שגיאת סיום רכיבה — inline מעל הכפתורים */}
+          {stopError && (
+            <p className="mx-auto mt-2 text-center text-xs text-rose-300">{stopError}</p>
+          )}
 
-        <div className="mv-card mt-2 flex items-center justify-between gap-2 rounded-2xl px-3 py-3">
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={onFinish}
-            className="rounded-xl border-rose-300/30 bg-rose-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 focus-visible:ring-2 focus-visible:ring-rose-300"
-          >
-            סיום
-          </Button>
+          <div className="mv-card mt-2 flex items-center justify-between gap-2 rounded-2xl px-3 py-3">
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={onFinish}
+              className="rounded-xl border-rose-300/30 bg-rose-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 focus-visible:ring-2 focus-visible:ring-rose-300"
+            >
+              סיום
+            </Button>
 
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setIsRidePaused((prev) => !prev)}
-            className="rounded-xl px-6 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-300"
-          >
-            {isRidePaused ? "המשך" : "השהה"}
-          </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsRidePaused((prev) => !prev)}
+              className="rounded-xl px-6 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-300"
+            >
+              {isRidePaused ? "המשך" : "השהה"}
+            </Button>
 
-          <Button
-            variant="ghost"
-            size="md"
-            className="h-10 w-10 rounded-xl p-0 text-base text-slate-200 focus-visible:ring-2 focus-visible:ring-emerald-300"
-            aria-label="צילום רגע"
-          >
-            📷
-          </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              className="h-10 w-10 rounded-xl p-0 text-base text-slate-200 focus-visible:ring-2 focus-visible:ring-emerald-300"
+              aria-label="צילום רגע"
+            >
+              📷
+            </Button>
+          </div>
         </div>
       </div>
     </section>
@@ -586,9 +588,8 @@ export default function RidePage({
 
   return (
     <>
-      {/* overflow-x-hidden מונע גלילה אופקית/חיתוך כאשר הדרופדאון קרוב לקצה המסך */}
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col overflow-x-hidden px-4 pb-10 pt-5 sm:px-6">
-        <main className="mt-6 flex flex-1 items-center justify-center">
+      <div className="mx-auto flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-6">
+        <main className="mt-8 flex flex-1 flex-col items-center justify-start min-h-0 pt-12">
           {/* מסך מוכנות לרכיבה לפני כניסה ל־HUD */}
           <GlassCard
             className="w-full max-w-xl text-center"
