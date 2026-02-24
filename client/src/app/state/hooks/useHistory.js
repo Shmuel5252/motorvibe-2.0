@@ -4,22 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-
-/**
- * עיצוב שניות לפורמט H:MM כמו במוק (0:05, 1:45).
- * @param {number} seconds
- * @returns {string}
- */
-function formatDuration(seconds) {
-  const totalSeconds = Math.max(0, Math.floor(seconds || 0));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+import { formatRideDuration } from "../../utils/formatters";
 
 /**
  * עיצוב תאריך כ-DD.MM.YY כמו במוק.
@@ -53,8 +38,8 @@ function calculatePathDistance(path) {
     const a =
       Math.sin(dLat / 2) ** 2 +
       Math.cos((prev.lat * Math.PI) / 180) *
-        Math.cos((curr.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
+      Math.cos((curr.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
     total += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
   return total;
@@ -80,10 +65,10 @@ function mapRideToUIShape(ride) {
     ride.durationSeconds ||
     (ride.endedAt && ride.startedAt
       ? Math.max(0, Math.floor(
-          (new Date(ride.endedAt) - new Date(ride.startedAt)) / 1000
-        ))
+        (new Date(ride.endedAt) - new Date(ride.startedAt)) / 1000
+      ))
       : 0);
-  const duration = formatDuration(rawSeconds);
+  const duration = formatRideDuration(rawSeconds);
 
   /* מרחק: snapshot > חישוב מנתיב GPS > 0 */
   const rawKm =
@@ -100,6 +85,8 @@ function mapRideToUIShape(ride) {
     date,
     duration,
     distance,
+    rawSeconds,
+    rawKm,
     /* snapshot מסלול — לשימוש המרה למסלול קבוע */
     routeSnapshot: ride.routeSnapshot || null,
     /* מסמך גולמי מהשרת — גישה ל-path ושדות נוספים */
