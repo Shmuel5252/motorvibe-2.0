@@ -163,7 +163,24 @@ export default function useAuth(apiClient) {
       if (typeof onNavigate === "function") onNavigate("home");
     } catch (error) {
       console.error("Auth failed", error);
-      setAuthError("התחברות נכשלה. בדוק פרטים ונסה שוב");
+      const backendError = error.response?.data?.message;
+      let errorMessage = authMode === "register"
+        ? "שגיאה בהרשמה. בדוק פרטים ונסה שוב."
+        : "התחברות נכשלה. בדוק פרטים ונסה שוב.";
+
+      if (backendError) {
+        if (backendError.toLowerCase().includes("already exists")) {
+          errorMessage = "משתמש עם אימייל זה כבר קיים";
+        } else if (backendError.toLowerCase().includes("invalid credentials") || backendError.toLowerCase().includes("wrong password")) {
+          errorMessage = "אימייל או סיסמה שגויים";
+        } else if (backendError.toLowerCase().includes("not found")) {
+          errorMessage = "משתמש לא נמצא";
+        } else {
+          errorMessage = backendError;
+        }
+      }
+
+      setAuthError(errorMessage);
     } finally {
       setIsAuthSubmitting(false);
     }
