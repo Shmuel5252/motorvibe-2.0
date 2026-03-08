@@ -12,6 +12,7 @@ import {
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 import { ISRAEL_DEFAULT_CENTER, ISRAEL_DEFAULT_ZOOM } from "../app/state/useAppState";
+import { Bike } from "lucide-react";
 
 /* ─── פונקציית עזר: Haversine — מחשבת מרחק בק"מ בין שתי נקודות GPS ─── */
 
@@ -32,6 +33,21 @@ function haversineKm(a, b) {
 /* ─── RideActiveMap ─── */
 
 const RideActiveMap = memo(function RideActiveMap({ center, myLocation, isMapLoaded, mapLoadError, routePath }) {
+  const [mapInstance, setMapInstance] = useState(null);
+
+  useEffect(() => {
+    if (mapInstance && myLocation) {
+      if (routePath && routePath.length > 0 && window.google) {
+        const bounds = new window.google.maps.LatLngBounds();
+        bounds.extend(myLocation);
+        routePath.forEach(p => bounds.extend(p));
+        mapInstance.fitBounds(bounds);
+      } else {
+        mapInstance.panTo(myLocation);
+      }
+    }
+  }, [mapInstance, myLocation, routePath]);
+
   if (mapLoadError) {
     return (
       <div className="flex h-full items-center justify-center bg-slate-900/60 text-sm text-slate-200">
@@ -69,6 +85,7 @@ const RideActiveMap = memo(function RideActiveMap({ center, myLocation, isMapLoa
       zoom={ISRAEL_DEFAULT_ZOOM}
       mapContainerClassName="h-full w-full"
       options={mapOptions}
+      onLoad={(m) => setMapInstance(m)}
     >
       {myLocation && <MarkerF position={myLocation} title="המיקום שלי" />}
 
@@ -100,14 +117,28 @@ function RideActiveHud({
   /* סטטיסטיקות בזמן אמת מה-GPS */
   totalDistanceKm,
   currentSpeedKmh,
+  maxSpeedKmh,
   gpsAccuracyPct,
 }) {
   const [mapCenter, setMapCenter] = useState(ISRAEL_DEFAULT_CENTER);
   const [myLocation, setMyLocation] = useState(null);
   const [isGpsUnavailable, setIsGpsUnavailable] = useState(false);
-  const [routePath, setRoutePath] = useState(null); // <-- שומרים רק את מערך הנקודות
+  const [routePath, setRoutePath] = useState(null);
 
-  const hasGoogleMapsApiKey = Boolean(mapApiKey);
+  /* יצירת לינקים לניווט חיצוני בהתאם לנקודת הסיום של המסלול הנבחר */
+  const navLinks = useMemo(() => {
+    let wazeUrl = "https://waze.com/ul";
+    let googleUrl = "https://maps.google.com/";
+
+    if (selectedRoute) {
+      const dest = selectedRoute.destination || selectedRoute.toLatLng || selectedRoute.end;
+      if (dest?.lat && dest?.lng) {
+        wazeUrl = `https://waze.com/ul?ll=${dest.lat},${dest.lng}&navigate=yes`;
+        googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`;
+      }
+    }
+    return { waze: wazeUrl, google: googleUrl };
+  }, [selectedRoute]);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -115,7 +146,7 @@ function RideActiveHud({
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const nextPosition = {
           lat: position.coords.latitude,
@@ -134,6 +165,8 @@ function RideActiveHud({
         maximumAge: 0,
       },
     );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   /* שליפת מסלול מג-Directions API כאשר נבחר מסלול והמפה נטענה */
@@ -209,89 +242,96 @@ function RideActiveHud({
             </Button>
           </div>
 
-          <p className="text-6xl font-bold tracking-wider text-white sm:text-7xl">
-            {hours}:{minutes}:{seconds}
-          </p>
+          <div className="flex flex-col items-center justify-center space-y-3 mt-8">
+            <p className="text-7xl font-mono font-light tracking-widest text-white sm:text-8xl drop-shadow-[0_0_15px_rgba(52,211,153,0.25)]">
+              {hours}:{minutes}:{seconds}
+            </p>
+            <div className="flex items-center gap-2.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 opacity-80 animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.4)]" />
+              <span className="text-sm font-medium tracking-widest text-slate-300">רכיבה פעילה</span>
+            </div>
+          </div>
 
-          {/* אינדיקציה למסלול פעיל גם בזמן HUD במסך מלא */}
+          {/* מחוון למסלול פעיל */}
           {selectedRoute && (
-            <div className="mx-auto mt-3 max-w-md rounded-xl border border-white/10 bg-slate-900/45 px-3 py-2 text-sm">
-              <p className="text-slate-200">
-                מסלול נבחר: {selectedRoute.title}
+            <div className="mx-auto mt-4 max-w-sm rounded-[1rem] border border-white/5 bg-white/5 px-4 py-2.5 text-sm backdrop-blur-md shadow-lg">
+              <p className="font-semibold text-emerald-300">
+                מסלול: {selectedRoute.title}
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-0.5 text-[11px] text-slate-400">
                 {selectedRoute.from} → {selectedRoute.to}
               </p>
             </div>
           )}
         </div>
 
-        {/* UI מפה: תופס את שאר המקום (flex-1 min-h-0) */}
-        <div className="mx-auto mt-4 w-full max-w-4xl flex-1 flex flex-col min-h-0 pb-4">
-          <div className="mv-card flex h-full flex-col overflow-hidden rounded-2xl border border-white/10">
-            <div className="flex-none flex items-center justify-between border-b border-white/10 px-3 py-2">
-              <span className="text-xs text-slate-200">מפת רכיבה</span>
-              {isGpsUnavailable && (
-                <span className="mv-pill px-2.5 py-1 text-xs text-amber-200">
-                  GPS: לא זמין
-                </span>
-              )}
+        {/* 2x2 Telemetry Grid */}
+        <div className="mx-auto mt-6 w-full max-w-md flex-1 px-2">
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* כרטיסייה 1: מהירות נוכחית */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 shadow-lg">
+              <svg className="h-6 w-6 text-slate-400 mb-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-4xl font-bold text-emerald-400 tracking-tight">{currentSpeedKmh}</span>
+              <span className="mt-1 text-xs font-medium text-slate-400 uppercase tracking-widest">קמ״ש</span>
             </div>
 
-            <div className="relative flex-1 min-h-0">
-              {!hasGoogleMapsApiKey ? (
-                <div className="flex h-full items-center justify-center bg-slate-900/60 px-4 text-sm text-slate-200">
-                  חסר מפתח Google Maps
-                </div>
-              ) : (
-                <RideActiveMap
-                  center={mapCenter}
-                  myLocation={myLocation}
-                  isMapLoaded={isMapLoaded}
-                  mapLoadError={mapLoadError}
-                  routePath={routePath}
-                />
-              )}
+            {/* כרטיסייה 2: מרחק */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 shadow-lg">
+              <svg className="h-6 w-6 text-slate-400 mb-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <span className="text-4xl font-bold text-emerald-400 tracking-tight">{totalDistanceKm.toFixed(1)}</span>
+              <span className="mt-1 text-xs font-medium text-slate-400 uppercase tracking-widest">ק״מ</span>
             </div>
+
+            {/* כרטיסייה 3: מהירות שיא */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-lg">
+              <svg className="h-5 w-5 text-slate-400 mb-2 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-2xl font-bold text-emerald-400">{maxSpeedKmh}</span>
+              <span className="mt-1 text-[10px] font-medium text-slate-500 uppercase tracking-widest">מהירות שיא</span>
+            </div>
+
+            {/* כרטיסייה 4: דיוק GPS */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 shadow-lg">
+              <svg className="h-5 w-5 text-slate-400 mb-2 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-2xl font-bold text-emerald-400">{gpsAccuracyPct !== null ? `${gpsAccuracyPct}%` : "--"}</span>
+              <span className="mt-1 text-[10px] font-medium text-slate-500 uppercase tracking-widest">דיוק GPS</span>
+            </div>
+
           </div>
-        </div>
 
-        {/* KPI צף בסגנון נקי: 3 עמודות עם אייקון, ערך גדול ותווית קטנה */}
-        {/* ערכי placeholder — יוחלפו בנתוני GPS ומחשוב אמיתיים */}
-        <div className="flex-none mx-auto mt-4 w-full max-w-3xl border-t border-white/10 pt-4">
-          {/* סדר עמודות לוגי: דיוק → מהירות → מרחק */}
-          <div className="grid grid-cols-3 gap-3 text-center">
-            {/* דיוק GPS באחוזים */}
-            <div className="flex flex-col items-center gap-1">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
-                🧭
-              </span>
-              <span className="text-xl font-semibold leading-none text-white">
-                {gpsAccuracyPct !== null ? `${gpsAccuracyPct}%` : "--"}
-              </span>
-              <span className="text-[10px] text-slate-400">דיוק</span>
-            </div>
-
-            {/* מהירות נוכחית בקמ"ש */}
-            <div className="flex flex-col items-center gap-1">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
-                ⏱️
-              </span>
-              <span className="text-xl font-semibold leading-none text-white">
-                {currentSpeedKmh > 0 ? currentSpeedKmh : "0"}
-              </span>
-              <span className="text-[10px] text-slate-400">מהירות (קמ״ש)</span>
-            </div>
-
-            {/* מרחק מצטבר בק"מ */}
-            <div className="flex flex-col items-center gap-1">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm">
-                📍
-              </span>
-              <span className="text-xl font-semibold leading-none text-white">
-                {totalDistanceKm > 0 ? totalDistanceKm.toFixed(1) : "0.0"}
-              </span>
-              <span className="text-[10px] text-slate-400">מרחק (ק״מ)</span>
+          {/* כפתורי ניווט חיצוניים */}
+          <div className="mt-8 flex flex-col items-center w-full px-2">
+            <span className="text-xs text-gray-400 mb-3 tracking-widest uppercase">נווט עם APPS</span>
+            <div className="flex w-full gap-3">
+              <button
+                type="button"
+                onClick={() => window.open(navLinks.waze, '_blank')}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition-all hover:bg-white/10 active:scale-95 backdrop-blur-md"
+              >
+                <svg className="h-4 w-4 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Waze
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(navLinks.google, '_blank')}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition-all hover:bg-white/10 active:scale-95 backdrop-blur-md"
+              >
+                <svg className="h-4 w-4 text-teal-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Google Maps
+              </button>
             </div>
           </div>
         </div>
@@ -303,33 +343,34 @@ function RideActiveHud({
             <p className="mx-auto mt-2 text-center text-xs text-rose-300">{stopError}</p>
           )}
 
-          <div className="mv-card mt-2 flex items-center justify-between gap-2 rounded-2xl px-3 py-3">
-            <Button
-              variant="ghost"
-              size="md"
+          <div className="mv-card mt-2 flex items-center justify-between gap-3 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-4 shadow-2xl">
+            <button
+              type="button"
               onClick={onFinish}
-              className="rounded-xl border-rose-300/30 bg-rose-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 focus-visible:ring-2 focus-visible:ring-rose-300"
+              className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 px-6 py-3 text-sm font-bold text-white shadow-[0_0_15px_rgba(52,211,153,0.3)] transition-all hover:scale-[1.03] active:scale-95"
             >
-              סיום
-            </Button>
+              סיום ושמירה
+            </button>
 
-            <Button
-              variant="primary"
-              size="md"
+            <button
+              type="button"
               onClick={() => setIsRidePaused((prev) => !prev)}
-              className="rounded-xl px-6 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-300"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 active:scale-95"
             >
-              {isRidePaused ? "המשך" : "השהה"}
-            </Button>
+              {isRidePaused ? "▶ המשך" : "⏸ השהה"}
+            </button>
 
             <Button
               variant="ghost"
               size="md"
               onClick={onCapturePhoto}
-              className="h-10 w-10 rounded-xl p-0 text-base text-slate-200 focus-visible:ring-2 focus-visible:ring-emerald-300"
-              aria-label="צילום רגע"
+              className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-0 text-slate-300 hover:text-white transition-colors active:scale-95"
+              aria-label="צילום תמונה"
             >
-              📷
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+              </svg>
             </Button>
           </div>
         </div>
@@ -399,6 +440,7 @@ export default function RidePage({
   /* סטטיסטיקות רכיבה בזמן אמת */
   const [totalDistanceKm, setTotalDistanceKm] = useState(0);
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
+  const [maxSpeedKmh, setMaxSpeedKmh] = useState(0); // Track max speed
   /* gpsAccuracyPct: null = טרם נמדד, 0–100 = אחוז ביטחון */
   const [gpsAccuracyPct, setGpsAccuracyPct] = useState(null);
 
@@ -412,17 +454,23 @@ export default function RidePage({
     let pollId = null;
 
     const pushPoint = (pos) => {
+      const accuracyM = pos.coords.accuracy ?? 50;
+
+      /* סינון חכם של עיוותי GPS (רעש במנוחה) */
+      if (accuracyM > 20) {
+        return; // מדלגים על הנקודה אם הדיוק גרוע מ-20 מטר
+      }
+
       const p = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         t: new Date().toISOString(),
       };
 
-      /* עדכון דיוק GPS — ממיר מ-מטרים לאחוז ביטחון (100m → 0%, 0m → 100%) */
-      const accuracyM = pos.coords.accuracy ?? 50;
+      /* עדכון דיוק GPS — ממיר מ-מטרים לאחוז ביטחון */
       setGpsAccuracyPct(Math.max(0, Math.min(100, Math.round(100 - accuracyM))));
 
-      /* מניעת נקודות כפולות/רעש GPS לפי סף מרחק מינימלי */
+      /* מניעת נקודות כפולות לפי סף מרחק זעיר */
       const last = lastGpsPointRef.current;
       if (
         last &&
@@ -437,12 +485,20 @@ export default function RidePage({
         const distKm = haversineKm(last, p);
         const timeDeltaH =
           (new Date(p.t).getTime() - new Date(last.t).getTime()) / 3_600_000;
-        /* מסנן החלקות קטנות מ-1 מ' ומרווחי זמן אפסיים */
+
+        /* סינון החלקות קטנות מ-1 מ' ומרווחי זמן אפסיים */
         if (timeDeltaH > 0 && distKm > 0.001) {
           setTotalDistanceKm((prev) =>
             parseFloat((prev + distKm).toFixed(2))
           );
-          setCurrentSpeedKmh(Math.round(distKm / timeDeltaH));
+
+          const rawSpeedKmh = distKm / timeDeltaH;
+          const newSpeed = rawSpeedKmh < 1.5 ? 0 : Math.round(rawSpeedKmh);
+          /* איפוס מהירות במנוחה או הליכה (מתחת 1.5), שומר על מהירות נסיעה איטית */
+          setCurrentSpeedKmh(newSpeed);
+          if (newSpeed > 0) {
+            setMaxSpeedKmh((prev) => Math.max(prev, newSpeed));
+          }
         }
       }
 
@@ -527,6 +583,7 @@ export default function RidePage({
           stopError={stopError}
           totalDistanceKm={totalDistanceKm}
           currentSpeedKmh={currentSpeedKmh}
+          maxSpeedKmh={maxSpeedKmh}
           gpsAccuracyPct={gpsAccuracyPct}
           onMinimize={() => {
             setIsRideMinimized(true);
@@ -640,7 +697,7 @@ export default function RidePage({
                     setDidStartFromRoute(false);
                     await fetchHistoryFromServer();
                     if (fetchBikesFromServer) await fetchBikesFromServer();
-                    onNavigate("history");
+                    onNavigate("routes");
                   }}
                 >
                   {isUploadingPhoto ? "מעלה..." : "שמור רכיבה"}
@@ -655,7 +712,7 @@ export default function RidePage({
                     setDidStartFromRoute(false);
                     await fetchHistoryFromServer();
                     if (fetchBikesFromServer) await fetchBikesFromServer();
-                    onNavigate("history");
+                    onNavigate("routes");
                   }}
                 >
                   ללא שם
@@ -674,109 +731,105 @@ export default function RidePage({
       <div className="mx-auto flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-6">
         <main className="mt-8 flex flex-1 flex-col items-center justify-start min-h-0 pt-12">
           {/* מסך מוכנות לרכיבה לפני כניסה ל־HUD */}
-          <GlassCard
-            className="w-full max-w-xl text-center"
-            title="מוכן לרכיבה?"
-          >
-            <p className="text-sm text-slate-300">
+          <div className="w-full max-w-xl text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+
+            <h2 className="text-3xl font-bold tracking-wide text-white mb-2">מוכן לרכיבה?</h2>
+            <p className="text-sm text-gray-300 mb-6 font-medium">
               הפעל מצב רכיבה פעילה לממשק מלא ללא ניווט.
             </p>
 
-            {/* אינדיקציה למסלול שנבחר ממסך המסלולים */}
-            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2 text-sm">
-              <p className="text-slate-200">
-                מסלול נבחר:{" "}
-                {rideSelectedRoute ? rideSelectedRoute.title : "ללא"}
-              </p>
-              {rideSelectedRoute && (
-                <p className="mt-1 text-xs text-slate-400">
-                  {rideSelectedRoute.from} → {rideSelectedRoute.to}
-                </p>
-              )}
-            </div>
-
             {/* שורת סטטוס קצרה לפני יציאה לרכיבה */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <span className="mv-pill px-3 py-1 text-xs font-medium text-emerald-200">
-                GPS: מוכן
-              </span>
-              <span className="mv-pill px-3 py-1 text-xs text-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-3 w-full mb-6">
+              <div className="flex items-center gap-2 rounded-full border border-white/5 bg-white/10 px-3 py-1.5 text-xs text-emerald-200 backdrop-blur-md shadow-sm">
+                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                <span className="font-semibold">GPS: מוכן</span>
+              </div>
+              <div className="rounded-full border border-white/5 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-sm">
                 דיוק משוער: גבוה
-              </span>
-            </div>
-
-            {/* בחירת מסלול אופציונלית */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2 text-sm">
-              <span className="text-slate-300">מסלול</span>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                {/* ניקוי מסלול באופן מפורש מהמשתמש */}
-                <Button
-                  variant="ghost"
-                  size="md"
-                  onClick={() => {
-                    setDidStartFromRoute(false);
-                  }}
-                  className={[
-                    "rounded-full bg-white/5 border text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto",
-                    !rideSelectedRoute
-                      ? "border-emerald-300/40 text-emerald-200"
-                      : "border-white/10 text-white/80 hover:text-white",
-                  ].join(" ")}
-                >
-                  ללא מסלול
-                </Button>
-
-                {/* מעבר יזום למסך מסלולים לבחירה */}
-                <Button
-                  variant="ghost"
-                  size="md"
-                  className="rounded-full bg-white/5 border border-white/10 text-sm px-4 py-2 leading-none backdrop-blur whitespace-nowrap w-auto text-white/80 hover:text-white"
-                  onClick={() => onNavigate("routes")}
-                >
-                  בחר מסלול
-                </Button>
               </div>
             </div>
 
+            {/* בחירת מסלול אופציונלית - Segmented Control */}
+            <div className="w-full bg-black/40 p-1 rounded-xl flex items-center mb-4 border border-white/5">
+              <button
+                type="button"
+                onClick={() => setDidStartFromRoute(false)}
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${!rideSelectedRoute
+                  ? "bg-[#1a2332] text-white shadow-md border border-white/5"
+                  : "text-gray-400 hover:text-gray-200"
+                  }`}
+              >
+                ללא מסלול
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate("routes")}
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${rideSelectedRoute
+                  ? "bg-[#1a2332] text-white shadow-md border border-white/5"
+                  : "text-gray-400 hover:text-gray-200"
+                  }`}
+              >
+                בחר מסלול
+              </button>
+            </div>
+
+            {/* אינדיקציה למסלול שנבחר */}
+            {rideSelectedRoute && (
+              <div className="w-full rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-right backdrop-blur-sm shadow-sm mb-4">
+                <p className="text-emerald-300 font-bold mb-0.5 text-sm">
+                  {rideSelectedRoute.title}
+                </p>
+                <p className="text-[11px] font-medium text-slate-400">
+                  {rideSelectedRoute.from} → {rideSelectedRoute.to}
+                </p>
+              </div>
+            )}
+
             {/* הערת בטיחות לפני התחלת רכיבה */}
-            <p className="mt-4 text-xs text-slate-400">
-              טיפ: בדוק קסדה ואורות לפני יציאה
+            <p className="mt-2 text-xs font-medium text-slate-400 w-full text-center flex items-center justify-center gap-1.5">
+              <Bike className="w-4 h-4 text-emerald-400 opacity-80" /> טיפ: בדוק קסדה ואורות לפני יציאה
             </p>
 
             {/* הצגת שגיאת התחלת רכיבה */}
             {startError && (
-              <p className="mt-3 text-center text-xs text-rose-300">{startError}</p>
+              <p className="mt-3 w-full text-center text-xs font-semibold text-rose-300">{startError}</p>
             )}
 
             {/* התחלת רכיבה: קריאת API ואז הפעלת UI */}
-            <Button
-              variant="primary"
-              size="lg"
-              className="mt-6 w-full"
+            <button
+              type="button"
+              className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 py-4 text-xl font-bold text-white shadow-xl shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
               onClick={async () => {
                 setStartError("");
+
                 try {
-                  const payload = rideSelectedRoute ? { routeId: rideSelectedRoute._id || rideSelectedRoute.id } : {};
+                  let payload = {};
+                  if (rideSelectedRoute) {
+                    const routeId = rideSelectedRoute?._id || rideSelectedRoute?.id;
+                    if (routeId) payload = { routeId };
+                  }
+
                   await apiClient.post("/rides/start", payload);
+
                   /* איפוס מסלול מוקלט וסטטיסטיקות לרכיבה חדשה */
                   setRecordedPath([]);
                   lastGpsPointRef.current = null;
                   setTotalDistanceKm(0);
                   setCurrentSpeedKmh(0);
+                  setMaxSpeedKmh(0);
                   setGpsAccuracyPct(null);
                   setIsRidePaused(false);
                   setIsRideMinimized(false);
                   setIsRideActive(true);
                 } catch (error) {
-                  // השארנו רק הדפסה שקטה מאחורי הקלעים למקרה שמשהו ישתבש בעתיד
                   console.error("Failed to start ride:", error);
                   setStartError("שגיאה בהתחלת רכיבה. נסה שוב.");
                 }
               }}
             >
               התחל רכיבה
-            </Button>
-          </GlassCard>
+            </button>
+          </div>
         </main>
       </div>
     </>

@@ -14,8 +14,8 @@ import useAppState from "./app/state/useAppState";
 import AppShell from "./app/layouts/AppShell";
 import HomePage from "./pages/HomePage";
 import RoutesPage from "./pages/RoutesPage";
+import ActivityPage from "./pages/ActivityPage";
 import RidePage from "./pages/RidePage";
-import HistoryPage from "./pages/HistoryPage";
 import MyBikePage from "./pages/MyBikePage";
 import { AuthScreen } from "./pages/SettingsPage";
 
@@ -170,16 +170,102 @@ function App() {
                 setSelectedRoute={state.setSelectedRoute}
                 setDidStartFromRoute={state.setDidStartFromRoute}
                 onNavigate={navigateTo}
+                bikes={state.bikes}
+                fetchBikesFromServer={state.fetchBikesFromServer}
               />
             </>
           );
         }
 
         if (activeTab === "routes") {
+          /* Route detail view: keep full-screen RoutesPage detail */
+          if (state.routesView === "routeDetails" && state.selectedRoute) {
+            return (
+              <>
+                {bikeTabLoader}
+                <RoutesPage
+                  /* ride state */
+                  isRideActive={isRideActive}
+                  isRideMinimized={isRideMinimized}
+                  setIsRideActive={setIsRideActive}
+                  setIsRidePaused={setIsRidePaused}
+                  setIsRideMinimized={setIsRideMinimized}
+                  setDidStartFromRoute={state.setDidStartFromRoute}
+                  onNavigate={navigateTo}
+                  /* map props */
+                  mapApiKey={state.googleMapsApiKey}
+                  isMapLoaded={state.isGoogleMapsLoaded}
+                  mapLoadError={state.googleMapsLoadError}
+                  /* routes state */
+                  routes={state.routes}
+                  selectedRoute={state.selectedRoute}
+                  setSelectedRoute={state.setSelectedRoute}
+                  routesView={state.routesView}
+                  setRoutesView={state.setRoutesView}
+                  goToRoutesListView={state.goToRoutesListView}
+                  isRoutesLoading={state.isRoutesLoading}
+                  routesLoadError={state.routesLoadError}
+                  routesSearchQuery={state.routesSearchQuery}
+                  setRoutesSearchQuery={state.setRoutesSearchQuery}
+                  selectedRoutesFilter={state.selectedRoutesFilter}
+                  setSelectedRoutesFilter={state.setSelectedRoutesFilter}
+                  isRoutesFilterMenuOpen={state.isRoutesFilterMenuOpen}
+                  setIsRoutesFilterMenuOpen={state.setIsRoutesFilterMenuOpen}
+                  routesFilterOptions={state.routesFilterOptions}
+                  getRouteLengthCategory={state.getRouteLengthCategory}
+                  getAdjustedDifficultyForTwisty={state.getAdjustedDifficultyForTwisty}
+                  getRoutePolylinePath={state.getRoutePolylinePath}
+                  isValidMapPoint={state.isValidMapPoint}
+                  getSafePolylinePath={state.getSafePolylinePath}
+                  fetchRoutesFromServer={state.fetchRoutesFromServer}
+                  authToken={state.authToken}
+                  apiClient={state.apiClient}
+                  /* new route form */
+                  newRouteTitle={state.newRouteTitle}
+                  setNewRouteTitle={state.setNewRouteTitle}
+                  newOriginLabel={state.newOriginLabel}
+                  setNewOriginLabel={state.setNewOriginLabel}
+                  newOriginLatLng={state.newOriginLatLng}
+                  setNewOriginLatLng={state.setNewOriginLatLng}
+                  newDestinationLabel={state.newDestinationLabel}
+                  setNewDestinationLabel={state.setNewDestinationLabel}
+                  newDestinationLatLng={state.newDestinationLatLng}
+                  setNewDestinationLatLng={state.setNewDestinationLatLng}
+                  newRouteType={state.newRouteType}
+                  setNewRouteType={state.setNewRouteType}
+                  newRouteDifficulty={state.newRouteDifficulty}
+                  setNewRouteDifficulty={state.setNewRouteDifficulty}
+                  newRouteIsTwisty={state.newRouteIsTwisty}
+                  setNewRouteIsTwisty={state.setNewRouteIsTwisty}
+                  isAddRouteExpanded={state.isAddRouteExpanded}
+                  setIsAddRouteExpanded={state.setIsAddRouteExpanded}
+                  activeMapPickField={state.activeMapPickField}
+                  setActiveMapPickField={state.setActiveMapPickField}
+                  mapPickCenter={state.mapPickCenter}
+                  setMapPickCenter={state.setMapPickCenter}
+                  mapPickStatus={state.mapPickStatus}
+                  setMapPickStatus={state.setMapPickStatus}
+                  mapPickRequestIdRef={state.mapPickRequestIdRef}
+                  originSuggestions={state.originSuggestions}
+                  setOriginSuggestions={state.setOriginSuggestions}
+                  destinationSuggestions={state.destinationSuggestions}
+                  setDestinationSuggestions={state.setDestinationSuggestions}
+                  activeSuggestionField={state.activeSuggestionField}
+                  setActiveSuggestionField={state.setActiveSuggestionField}
+                  newRouteLocationError={state.newRouteLocationError}
+                  setNewRouteLocationError={state.setNewRouteLocationError}
+                  isPlacesSuggestionsReady={state.isPlacesSuggestionsReady}
+                  handleUnauthorized={state.handleUnauthorized}
+                />
+              </>
+            );
+          }
+
+          /* Default: unified Activity dashboard */
           return (
             <>
               {bikeTabLoader}
-              <RoutesPage
+              <ActivityPage
                 /* ride state */
                 isRideActive={isRideActive}
                 isRideMinimized={isRideMinimized}
@@ -192,13 +278,10 @@ function App() {
                 mapApiKey={state.googleMapsApiKey}
                 isMapLoaded={state.isGoogleMapsLoaded}
                 mapLoadError={state.googleMapsLoadError}
-                /* routes state */
+                /* routes props */
                 routes={state.routes}
                 selectedRoute={state.selectedRoute}
                 setSelectedRoute={state.setSelectedRoute}
-                routesView={state.routesView}
-                setRoutesView={state.setRoutesView}
-                goToRoutesListView={state.goToRoutesListView}
                 isRoutesLoading={state.isRoutesLoading}
                 routesLoadError={state.routesLoadError}
                 routesSearchQuery={state.routesSearchQuery}
@@ -252,6 +335,20 @@ function App() {
                 setNewRouteLocationError={state.setNewRouteLocationError}
                 isPlacesSuggestionsReady={state.isPlacesSuggestionsReady}
                 handleUnauthorized={state.handleUnauthorized}
+                /* history props */
+                historyRides={state.historyRides}
+                historyFilters={state.historyFilters}
+                selectedHistoryFilter={state.selectedHistoryFilter}
+                setSelectedHistoryFilter={state.setSelectedHistoryFilter}
+                isHistoryFilterMenuOpen={state.isHistoryFilterMenuOpen}
+                setIsHistoryFilterMenuOpen={state.setIsHistoryFilterMenuOpen}
+                selectedHistoryRide={state.selectedHistoryRide}
+                setSelectedHistoryRide={state.setSelectedHistoryRide}
+                historyRideNotes={state.historyRideNotes}
+                setHistoryRideNotes={state.setHistoryRideNotes}
+                searchQuery={state.searchQuery}
+                setSearchQuery={state.setSearchQuery}
+                fetchHistoryFromServer={state.fetchHistoryFromServer}
               />
             </>
           );
@@ -284,38 +381,6 @@ function App() {
           );
         }
 
-        if (activeTab === "history") {
-          return (
-            <>
-              {bikeTabLoader}
-              <HistoryPage
-                isRideActive={isRideActive}
-                isRideMinimized={isRideMinimized}
-                onNavigate={navigateTo}
-                historyRides={state.historyRides}
-                historyFilters={state.historyFilters}
-                selectedHistoryFilter={state.selectedHistoryFilter}
-                setSelectedHistoryFilter={state.setSelectedHistoryFilter}
-                isHistoryFilterMenuOpen={state.isHistoryFilterMenuOpen}
-                setIsHistoryFilterMenuOpen={state.setIsHistoryFilterMenuOpen}
-                selectedHistoryRide={state.selectedHistoryRide}
-                setSelectedHistoryRide={state.setSelectedHistoryRide}
-                historyRideNotes={state.historyRideNotes}
-                setHistoryRideNotes={state.setHistoryRideNotes}
-                searchQuery={state.searchQuery}
-                setSearchQuery={state.setSearchQuery}
-                apiClient={state.apiClient}
-                fetchHistoryFromServer={state.fetchHistoryFromServer}
-                fetchRoutesFromServer={state.fetchRoutesFromServer}
-                /* map props — pass-through בלבד */
-                mapApiKey={state.googleMapsApiKey}
-                isMapLoaded={state.isGoogleMapsLoaded}
-                mapLoadError={state.googleMapsLoadError}
-              />
-            </>
-          );
-        }
-
         /* ברירת מחדל — טאב bike */
         return (
           <>
@@ -341,6 +406,8 @@ function App() {
               bikePhotoPreview={state.bikePhotoPreview}
               setBikePhotoPreview={state.setBikePhotoPreview}
               bikePhotoInputRef={state.bikePhotoInputRef}
+              apiClient={state.apiClient}
+              fetchBikesFromServer={state.fetchBikesFromServer}
             />
           </>
         );

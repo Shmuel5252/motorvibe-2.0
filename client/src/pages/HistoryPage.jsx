@@ -12,6 +12,7 @@ import {
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 import { formatRideDuration } from "../app/utils/formatters";
+import { Timer, MapPin } from "lucide-react";
 
 /* ─── סגנון מפה כהה (Dark Map Style) ─── */
 const DARK_MAP_STYLE = [
@@ -380,8 +381,8 @@ export default function HistoryPage({
                   <p className="mt-1 text-xs text-slate-400">{ride.date}</p>
 
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                    <span>⏱️ {ride.duration}</span>
-                    <span>📍 {ride.distance}</span>
+                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> {ride.duration}</span>
+                    <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {ride.distance}</span>
                   </div>
                 </div>
 

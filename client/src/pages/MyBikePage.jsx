@@ -6,18 +6,25 @@
 import { useState, useEffect } from "react";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
+import { Bike, Pencil, Trash2 } from "lucide-react";
 
 /* ─── קבועים ─── */
 
 const SERVICE_TYPES = ["שמן", "שרשרת", "בלמים", "צמיגים", "טסט", "אחר"];
+
+const IMG_BASE = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000";
+function imgSrc(url) {
+  if (!url) return null;
+  return url.startsWith("http") ? url : `${IMG_BASE}${url}`;
+}
 
 /* ─── ActiveRideBanner ─── */
 
 function ActiveRideBanner({ isRideActive, isRideMinimized, onNavigate }) {
   if (!isRideActive || isRideMinimized) return null;
   return (
-    <section className="mv-card mb-5 flex items-center justify-between gap-3 px-4 py-2.5">
-      <span className="text-sm text-emerald-200">יש רכיבה פעילה</span>
+    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg mb-5 flex items-center justify-between gap-3 px-4 py-2.5">
+      <span className="text-sm font-bold text-emerald-400">יש רכיבה פעילה</span>
       <Button variant="ghost" size="md" onClick={() => onNavigate("ride")}>
         חזור לרכיבה
       </Button>
@@ -41,8 +48,9 @@ function BikeFormModal({ initialData, onSave, onClose, isSaving, error }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const generatedName = `${form.make.trim()} ${form.model.trim()}`.trim() || "האופנוע שלי";
     const payload = {
-      name: form.name.trim(),
+      name: generatedName,
       make: form.make.trim() || undefined,
       model: form.model.trim() || undefined,
       year: form.year ? Number(form.year) : undefined,
@@ -55,53 +63,40 @@ function BikeFormModal({ initialData, onSave, onClose, isSaving, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-[#0B132B]/90 backdrop-blur-2xl p-6 shadow-2xl">
         <p className="text-base font-semibold text-slate-100">
           {initialData ? "ערוך אופנוע" : "הוסף אופנוע"}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-          {/* שם תצוגה */}
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">שם / כינוי *</label>
-            <input
-              required
-              value={form.name}
-              onChange={set("name")}
-              placeholder='למשל: "המסרטה שלי"'
-              maxLength={60}
-              className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-            />
-          </div>
-
           {/* יצרן */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">יצרן</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">יצרן</label>
               <input
                 value={form.make}
                 onChange={set("make")}
                 placeholder="Yamaha"
                 maxLength={60}
-                className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="w-full transition-all rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-transparent focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">דגם</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">דגם</label>
               <input
                 value={form.model}
                 onChange={set("model")}
                 placeholder="MT-07"
                 maxLength={60}
-                className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="w-full transition-all rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-transparent focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
 
           {/* שנה, סמ"ק */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs text-slate-400">שנה</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">שנה</label>
               <input
                 type="number"
                 value={form.year}
@@ -109,49 +104,49 @@ function BikeFormModal({ initialData, onSave, onClose, isSaving, error }) {
                 placeholder="2023"
                 min={1900}
                 max={2100}
-                className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="w-full transition-all rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-transparent focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-slate-400">סמ״ק (CC)</label>
+              <label className="mb-1 block text-sm font-medium text-gray-400">סמ״ק (CC)</label>
               <input
                 type="number"
                 value={form.engineCc}
                 onChange={set("engineCc")}
                 placeholder="700"
                 min={0}
-                className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="w-full transition-all rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-transparent focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
 
           {/* קילומטרז' */}
           <div>
-            <label className="mb-1 block text-xs text-slate-400">קילומטרז׳ נוכחי</label>
+            <label className="mb-1 block text-sm font-medium text-gray-400">קילומטרז׳ נוכחי</label>
             <input
               type="number"
               value={form.currentOdometerKm}
               onChange={set("currentOdometerKm")}
               placeholder="12500"
               min={0}
-              className="w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              className="w-full transition-all rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-transparent focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
           </div>
 
           {error && <p className="text-xs text-rose-300">{error}</p>}
 
-          <div className="mt-2 flex gap-2">
+          <div className="mt-4 flex gap-3">
             <button
               type="submit"
               disabled={isSaving}
-              className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-semibold text-white hover:bg-emerald-400 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] disabled:opacity-50"
             >
               {isSaving ? "שומר..." : "שמור"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-slate-300 hover:text-white"
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-gray-300 transition-all hover:bg-white/10 hover:text-white"
             >
               ביטול
             </button>
@@ -190,7 +185,7 @@ function ServiceFormModal({ bikeOdometer, onSave, onClose, isSaving, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl">
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-2xl p-6 shadow-2xl">
         <p className="text-base font-semibold text-slate-100">הוסף שירות</p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -288,15 +283,15 @@ function ServiceFormModal({ bikeOdometer, onSave, onClose, isSaving, error }) {
 function MaintenanceLogRow({ log, onDelete }) {
   const date = log.date ? new Date(log.date).toLocaleDateString("he-IL") : "";
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2.5">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-sm px-3 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-100">{log.type}</span>
-          <span className="text-xs text-slate-400">{date}</span>
+          <span className="text-xs text-emerald-400 font-bold">{date}</span>
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-400">
-          <span>{log.odometerKm?.toLocaleString("he-IL")} ק״מ</span>
-          {log.cost != null && <span>₪{log.cost}</span>}
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
+          <span><span className="text-emerald-400 font-bold">{log.odometerKm?.toLocaleString("he-IL")}</span> ק״מ</span>
+          {log.cost != null && <span><span className="text-emerald-400 font-bold">₪{log.cost}</span></span>}
         </div>
         {log.notes && <p className="mt-1 text-xs text-slate-400">{log.notes}</p>}
       </div>
@@ -306,7 +301,7 @@ function MaintenanceLogRow({ log, onDelete }) {
         className="shrink-0 rounded-lg p-1 text-slate-500 hover:text-rose-300 focus-visible:ring-2 focus-visible:ring-rose-400"
         aria-label="מחק רשומה"
       >
-        🗑
+        <Trash2 className="w-4 h-4" />
       </button>
     </div>
   );
@@ -352,6 +347,8 @@ export default function MyBikePage({
   bikePhotoPreview,
   setBikePhotoPreview,
   bikePhotoInputRef,
+  apiClient,
+  fetchBikesFromServer,
 }) {
   /* ─── Local UI State ─── */
   const [showBikeForm, setShowBikeForm] = useState(false);
@@ -365,6 +362,9 @@ export default function MyBikePage({
 
   const [confirmDeleteBike, setConfirmDeleteBike] = useState(false);
   const [bikeDeleteError, setBikeDeleteError] = useState("");
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   /* נטען רשומות תחזוקה כשיש אופנוע */
   const bike = bikes?.[0] || null;
@@ -430,10 +430,48 @@ export default function MyBikePage({
     }
   };
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Set local preview immediately for UX
+    if (bikePhotoPreview?.startsWith("blob:")) URL.revokeObjectURL(bikePhotoPreview);
+    setBikePhotoPreview(URL.createObjectURL(file));
+
+    if (!bike?._id) return; // Cannot upload if bike doesn't exist yet
+
+    setIsUploading(true);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file); // Backend expects "image" field
+
+      // 1. Upload the image to the server
+      const uploadRes = await apiClient.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const newUrl = uploadRes.data.imageUrl;
+
+      // 2. Patch the bike record with the new imageUrl
+      await apiClient.patch(`/bikes/${bike._id}`, { imageUrl: newUrl });
+
+      // 3. Refresh bike data
+      await fetchBikesFromServer();
+    } catch (err) {
+      console.error("🚨 IMAGE UPLOAD FAILED 🚨", err.response?.data || err.message);
+      setUploadError("שגיאה בהעלאת תמונה למערכת");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   /* ─── Render ─── */
+  const displayImage = bikePhotoPreview || imgSrc(bike?.imageUrl);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6 bg-transparent">
       <main className="mt-6 flex-1">
         <ActiveRideBanner
           isRideActive={isRideActive}
@@ -455,10 +493,10 @@ export default function MyBikePage({
             <Button
               variant="ghost"
               size="md"
-              className="text-xs text-emerald-300"
+              className="text-xs text-emerald-300 flex items-center gap-1.5"
               onClick={() => { setEditingBike(bike); setShowBikeForm(true); }}
             >
-              ✏️ ערוך
+              <Pencil className="w-3.5 h-3.5" /> ערוך
             </Button>
           )}
         </section>
@@ -469,8 +507,8 @@ export default function MyBikePage({
 
         {/* Empty State — אין אופנוע */}
         {!bikesLoading && !bikesError && !bike && (
-          <section className="mt-8 flex flex-col items-center justify-center gap-4 rounded-2xl border border-white/10 bg-slate-900/40 py-14 text-center">
-            <span className="text-5xl">🏍️</span>
+          <section className="mt-8 flex flex-col items-center justify-center gap-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-sm py-14 text-center">
+            <div className="flex justify-center mb-2"><Bike className="w-12 h-12 text-slate-500 opacity-50" /></div>
             <div>
               <p className="text-base font-semibold text-slate-100">עדיין אין אופנוע</p>
               <p className="mt-1 text-sm text-slate-400">הוסף את האופנוע שלך כדי לעקוב אחר תחזוקה</p>
@@ -493,7 +531,7 @@ export default function MyBikePage({
               <GlassCard
                 title={bike.name || bike.model || "האופנוע שלי"}
                 right={
-                  <span className="mv-pill px-2.5 py-1 text-xs font-medium text-emerald-200">תקין</span>
+                  <span className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-lg px-2.5 py-1 text-xs font-bold text-emerald-400">תקין</span>
                 }
               >
                 {/* פרטי האופנוע */}
@@ -505,29 +543,33 @@ export default function MyBikePage({
                 </div>
 
                 {/* תצוגת תמונה / placeholder */}
-                <div className="relative mt-4 h-40 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-slate-900/90 via-slate-800/60 to-emerald-900/25">
+                <div className="relative mt-4 h-48 md:h-64 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-slate-900/90 via-slate-800/60 to-emerald-900/25">
                   <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[24px_24px]" />
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(20,184,166,0.18),transparent_55%)]" />
-                  {bikePhotoPreview ? (
-                    <img src={bikePhotoPreview} alt="תמונת אופנוע" className="h-full w-full object-cover" />
+                  {displayImage ? (
+                    <img src={displayImage} alt="תמונת אופנוע" className="h-full w-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 flex items-end p-3">
-                      <span className="mv-pill px-2.5 py-1 text-xs text-slate-200">תמונת אופנוע</span>
+                      <span className="bg-black/60 backdrop-blur-md rounded-full shadow-sm px-3 py-1.5 text-xs font-semibold text-white">תמונת אופנוע</span>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <Button variant="ghost" size="md" onClick={() => bikePhotoInputRef.current?.click()}>
-                    העלה תמונה
-                  </Button>
-                  <button
-                    type="button"
-                    className="text-xs text-rose-400 hover:text-rose-300"
-                    onClick={() => { setBikeDeleteError(""); setConfirmDeleteBike(true); }}
-                  >
-                    מחק אופנוע
-                  </button>
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Button variant="ghost" size="md" onClick={() => bikePhotoInputRef.current?.click()} disabled={isUploading}>
+                      {isUploading ? "מעלה..." : "העלה תמונה"}
+                    </Button>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-rose-400 focus-visible:ring-2 focus-visible:ring-rose-400 transition"
+                      onClick={() => { setBikeDeleteError(""); setConfirmDeleteBike(true); }}
+                      aria-label="מחק אופנוע"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {uploadError && <p className="text-xs text-rose-400">{uploadError}</p>}
                 </div>
 
                 {/* input מוסתר לבחירת קובץ */}
@@ -536,20 +578,15 @@ export default function MyBikePage({
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (bikePhotoPreview?.startsWith("blob:")) URL.revokeObjectURL(bikePhotoPreview);
-                    setBikePhotoPreview(URL.createObjectURL(file));
-                  }}
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
                 />
               </GlassCard>
             </section>
 
-            {/* סטטיסטיקות מהירה */}
             <section className="mt-3 flex flex-wrap gap-2">
-              <span className="mv-pill px-3 py-1 text-xs text-slate-200">
-                ק״מ: {bike.currentOdometerKm?.toLocaleString("he-IL") ?? "--"}
+              <span className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full shadow-lg px-3 py-1 text-xs text-gray-400">
+                ק״מ: <span className="text-emerald-400 font-bold">{bike.currentOdometerKm?.toLocaleString("he-IL") ?? "--"}</span>
               </span>
             </section>
 
@@ -597,54 +634,60 @@ export default function MyBikePage({
       {/* ─── מודלים ─── */}
 
       {/* מודל טופס אופנוע */}
-      {showBikeForm && (
-        <BikeFormModal
-          initialData={editingBike}
-          onSave={handleSaveBike}
-          onClose={() => { setShowBikeForm(false); setEditingBike(null); }}
-          isSaving={bikeFormSaving}
-          error={bikeFormError}
-        />
-      )}
+      {
+        showBikeForm && (
+          <BikeFormModal
+            initialData={editingBike}
+            onSave={handleSaveBike}
+            onClose={() => { setShowBikeForm(false); setEditingBike(null); }}
+            isSaving={bikeFormSaving}
+            error={bikeFormError}
+          />
+        )
+      }
 
       {/* מודל אישור מחיקת אופנוע */}
-      {confirmDeleteBike && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
-          <div className="relative z-10 w-full max-w-xs rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center shadow-2xl">
-            <p className="text-base font-semibold text-slate-100">מחק את האופנוע?</p>
-            <p className="mt-1 text-xs text-slate-400">הפעולה תמחק גם את כל רשומות התחזוקה</p>
-            {bikeDeleteError && <p className="mt-2 text-xs text-rose-300">{bikeDeleteError}</p>}
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={handleDeleteBike}
-                className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-semibold text-white hover:bg-rose-500"
-              >
-                מחק
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteBike(false)}
-                className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-slate-300 hover:text-white"
-              >
-                ביטול
-              </button>
+      {
+        confirmDeleteBike && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-xs rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-2xl p-6 text-center shadow-2xl">
+              <p className="text-base font-semibold text-slate-100">מחק את האופנוע?</p>
+              <p className="mt-1 text-xs text-slate-400">הפעולה תמחק גם את כל רשומות התחזוקה</p>
+              {bikeDeleteError && <p className="mt-2 text-xs text-rose-300">{bikeDeleteError}</p>}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteBike}
+                  className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-semibold text-white hover:bg-rose-500"
+                >
+                  מחק
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteBike(false)}
+                  className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-slate-300 hover:text-white"
+                >
+                  ביטול
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* מודל הוספת שירות */}
-      {showServiceForm && (
-        <ServiceFormModal
-          bikeOdometer={bike?.currentOdometerKm}
-          onSave={handleAddService}
-          onClose={() => setShowServiceForm(false)}
-          isSaving={serviceFormSaving}
-          error={serviceFormError}
-        />
-      )}
-    </div>
+      {
+        showServiceForm && (
+          <ServiceFormModal
+            bikeOdometer={bike?.currentOdometerKm}
+            onSave={handleAddService}
+            onClose={() => setShowServiceForm(false)}
+            isSaving={serviceFormSaving}
+            error={serviceFormError}
+          />
+        )
+      }
+    </div >
   );
 }

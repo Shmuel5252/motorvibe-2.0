@@ -2,10 +2,16 @@
  * HomePage — מסך הבית.
  * רכיב Stateless: מקבל את כל הנתונים וה-Handlers כ-Props מ-App.jsx.
  */
-
+import { useEffect } from "react";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 import { formatRideDuration } from "../app/utils/formatters";
+
+const IMG_BASE = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000";
+function imgSrc(url) {
+  if (!url) return null;
+  return url.startsWith("http") ? url : `${IMG_BASE}${url}`;
+}
 
 /**
  * באנר רכיבה פעילה לטאבים שאינם מסך הרכיבה.
@@ -17,8 +23,8 @@ function ActiveRideBanner({ isRideActive, isRideMinimized, onNavigate }) {
   }
 
   return (
-    <section className="mv-card mb-5 flex items-center justify-between gap-3 px-4 py-2.5">
-      <span className="text-sm text-emerald-200">יש רכיבה פעילה</span>
+    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg mb-5 flex items-center justify-between gap-3 px-4 py-2.5">
+      <span className="text-sm font-bold text-emerald-400">יש רכיבה פעילה</span>
       <Button variant="ghost" size="md" onClick={() => onNavigate("ride")}>
         חזור לרכיבה
       </Button>
@@ -51,39 +57,30 @@ export default function HomePage({
   setSelectedRoute,
   setDidStartFromRoute,
   onNavigate,
+  bikes = [],
+  fetchBikesFromServer,
 }) {
+  useEffect(() => {
+    if (fetchBikesFromServer && bikes.length === 0) {
+      fetchBikesFromServer();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const bike = bikes?.[0] || null;
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col pb-10 pt-5 text-slate-100">
       {/* תמונת רגע רקע לכל הדף */}
-      <div className="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-[#020617]">
+      <div className="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-transparent">
         <img
           src="/assets/motorcycle-hero.jpg"
           alt="רקע אופנוע"
-          className="absolute top-0 w-full object-cover opacity-85 h-[70vh] object-[center_bottom] sm:h-screen sm:object-[center_60%]"
+          className="absolute top-0 w-full object-cover opacity-60 h-[70vh] object-[center_bottom] sm:h-screen sm:object-[center_60%] [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]"
           loading="eager"
         />
-        {/* גרדיאנט למובייל: משלב את חיתוך ה-70vh בצורה חלקה לתוך הרקע */}
-        <div
-          className="pointer-events-none absolute inset-0 sm:hidden"
-          style={{
-            background: [
-              "linear-gradient(to bottom, rgba(2,6,23,0.95) 0%, rgba(2,6,23,0) 25%, rgba(2,6,23,0.2) 55%, #020617 70%, #020617 100%)",
-              "linear-gradient(to right, rgba(2,6,23,0.95) 0%, transparent 20%, transparent 80%, rgba(2,6,23,0.95) 100%)",
-            ].join(", "),
-          }}
-        />
-        {/* גרדיאנט לדסקטופ: פריסה רחבה על כל המסך */}
-        <div
-          className="pointer-events-none absolute inset-0 hidden sm:block"
-          style={{
-            background: [
-              "linear-gradient(to bottom, rgba(2,6,23,0.8) 0%, rgba(2,6,23,0) 20%, rgba(2,6,23,0.2) 65%, #020617 95%, #020617 100%)",
-              "linear-gradient(to right, rgba(2,6,23,0.95) 0%, rgba(2,6,23,0.1) 20%, rgba(2,6,23,0.1) 80%, rgba(2,6,23,0.95) 100%)",
-            ].join(", "),
-          }}
-        />
         {/* רדיאל ירוק/כחלחל שנותן אווירות 'Motovibe' למראה הסופי */}
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(20,184,166,0.15),transparent_60%)] sm:bg-[radial-gradient(ellipse_at_top_right,rgba(20,184,166,0.18),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(20,184,166,0.15),transparent_60%)]" />
       </div>
 
       {/* אזור תוכן עיקרי של דף הבית */}
@@ -142,16 +139,16 @@ export default function HomePage({
                 {recentRoutes.map((route) => (
                   <div
                     key={route.id}
-                    className="rounded-xl bg-slate-900/40 px-3 py-2 ring-1 ring-white/10"
+                    className="rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 p-3 shadow-sm"
                   >
                     <h3 className="text-sm font-semibold text-slate-100">
                       {route.title}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-gray-400">
                       {route.from} → {route.to}
                     </p>
-                    <p className="mt-1 text-xs text-slate-300">
-                      {route.distanceKm} ק״מ • {route.etaMin} דק׳
+                    <p className="mt-1 text-xs text-gray-300">
+                      <span className="text-emerald-400 font-bold">{route.distanceKm}</span> ק״מ • <span className="text-emerald-400 font-bold">{route.etaMin}</span> דק׳
                     </p>
                   </div>
                 ))}
@@ -159,19 +156,44 @@ export default function HomePage({
             )}
           </GlassCard>
 
-          <GlassCard
-            title="האופנוע שלי"
-            right={
-              <span className="mv-pill px-2.5 py-1 text-xs font-medium text-emerald-200">
-                תקין
-              </span>
-            }
-          >
-            <div className="space-y-3">
-              <div className="h-28 rounded-xl bg-linear-to-br from-slate-900/90 via-slate-800/60 to-emerald-900/30 ring-1 ring-white/10" />
-              <p className="text-sm text-slate-300">טיפול הבא: 800 ק״מ</p>
-            </div>
-          </GlassCard>
+          <div onClick={() => onNavigate("bike")} className="cursor-pointer group">
+            <GlassCard
+              title={bike ? (bike.name || bike.model || "האופנוע שלי") : "האופנוע שלי"}
+              right={
+                bike ? (
+                  <span className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-lg px-2.5 py-1 text-xs font-bold text-emerald-400 group-hover:bg-white/10 transition-colors">
+                    תקין
+                  </span>
+                ) : null
+              }
+              className="group-hover:bg-white/[0.08] transition-all duration-300 h-full"
+            >
+              {bike ? (
+                <div className="space-y-3">
+                  <div className="relative h-28 overflow-hidden rounded-xl border border-white/10 bg-linear-to-br from-slate-900/90 via-slate-800/60 to-emerald-900/25 shadow-inner">
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[24px_24px]" />
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(20,184,166,0.18),transparent_55%)]" />
+                    {imgSrc(bike.imageUrl) ? (
+                      <img src={imgSrc(bike.imageUrl)} alt="תמונת אופנוע" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-semibold text-slate-400">{bike.make || ""} {bike.model || "האופנוע שלי"}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-400">סה״כ ק״מ:</p>
+                    <p className="text-emerald-400 font-bold">{bike.currentOdometerKm != null ? bike.currentOdometerKm.toLocaleString("he-IL") : "--"}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center space-y-2 py-4">
+                  <p className="text-sm font-semibold text-slate-100">אין אופנוע שמור</p>
+                  <p className="text-xs text-slate-400">לחץ כאן כדי להוסיף את האופנוע שלך</p>
+                </div>
+              )}
+            </GlassCard>
+          </div>
         </section>
       </main>
 
@@ -182,13 +204,13 @@ export default function HomePage({
         const totalSeconds = historyRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
 
         return (
-          <section className="mv-pill mx-4 mt-6 px-4 py-3 sm:mx-6">
-            <div className="flex items-center justify-between gap-2 text-sm text-slate-200">
-              <span>{totalRides} רכיבות</span>
-              <span className="text-white/30">|</span>
-              <span>{totalSeconds > 0 ? formatRideDuration(totalSeconds) : "--"}</span>
-              <span className="text-white/30">|</span>
-              <span>{totalKm > 0 ? parseFloat(totalKm.toFixed(1)) : "--"} ק״מ</span>
+          <section className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full shadow-lg mx-4 mt-6 px-4 py-3 sm:mx-6">
+            <div className="flex items-center justify-between gap-2 text-sm text-gray-400">
+              <span><span className="text-emerald-400 font-bold">{totalRides}</span> רכיבות</span>
+              <span className="text-white/20">|</span>
+              <span className="text-emerald-400 font-bold">{totalSeconds != null ? formatRideDuration(totalSeconds) : "--"}</span>
+              <span className="text-white/20">|</span>
+              <span><span className="text-emerald-400 font-bold">{totalKm != null ? parseFloat(totalKm.toFixed(1)) : "--"}</span> ק״מ</span>
             </div>
           </section>
         );

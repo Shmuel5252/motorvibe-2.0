@@ -9,7 +9,7 @@
  */
 function GlassCard({ title, right, className = "", children }) {
   return (
-    <section className={`mv-card p-5 ${className}`.trim()}>
+    <section className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg p-5 ${className}`.trim()}>
       {/* כותרת אופציונלית: מוצגת רק אם יש title או right */}
       {(title || right) && (
         <header className="mb-4 flex items-center justify-between">
