@@ -587,6 +587,7 @@ export default function RidePage({
           currentSpeedKmh={currentSpeedKmh}
           maxSpeedKmh={maxSpeedKmh}
           gpsAccuracyPct={gpsAccuracyPct}
+          recordedPath={recordedPath}
           onMinimize={() => {
             setIsRideMinimized(true);
             onNavigate("home");

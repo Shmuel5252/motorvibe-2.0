@@ -11,8 +11,8 @@ export const ISRAEL_DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
 export const ISRAEL_DEFAULT_ZOOM = 11;
 
 const MAP_LOADER_ID = "motovibe-maps";
-/** ספריות טעינת מפה יציבות (כולל Places להצעות אוטומטיות). */
-const MAP_LIBRARIES = ["maps", "places"];
+/** ספריות טעינת מפה יציבות (כולל Places ו-Geometry לנקודות). */
+const MAP_LIBRARIES = ["places", "geometry"];
 
 /**
  * @param {string} googleMapsApiKey - מפתח ה-API ל-Google Maps.
