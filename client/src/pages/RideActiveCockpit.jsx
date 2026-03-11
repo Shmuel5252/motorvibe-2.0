@@ -544,10 +544,13 @@ const DARK_MAP_STYLES = [
     { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
 
-export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customContainerClass, customContainerStyle, innerClassName = "rounded-3xl overflow-hidden border border-white/10 shadow-lg relative w-full h-full", controlsContainerClassName, children }) {
+export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, recordedPath, customContainerClass, customContainerStyle, innerClassName = "rounded-3xl overflow-hidden border border-white/10 shadow-lg relative w-full h-full", controlsContainerClassName, children }) {
     const [myLocation, setMyLocation] = useState(null);
     const [mapInstance, setMapInstance] = useState(null);
     const [routePath, setRoutePath] = useState(null);
+    const [hasFitRoute, setHasFitRoute] = useState(false);
+    const [center, setCenter] = useState(ISRAEL_DEFAULT_CENTER);
+    const [zoom, setZoom] = useState(15);
 
     // Track GPS position
     useEffect(() => {
@@ -561,10 +564,39 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
         return () => navigator.geolocation.clearWatch(id);
     }, []);
 
-    // Pan map to rider
+    // Set initial center if map hasn't loaded bounds yet
     useEffect(() => {
-        if (mapInstance && myLocation) mapInstance.panTo(myLocation);
-    }, [mapInstance, myLocation]);
+        if (myLocation && !mapInstance && !selectedRoute) {
+            setCenter(myLocation);
+        }
+    }, [myLocation, mapInstance, selectedRoute]);
+
+    // Fit route bounds ONCE when map and route load
+    useEffect(() => {
+        if (!mapInstance || !routePath || routePath.length === 0 || hasFitRoute) return;
+        
+        const bounds = new window.google.maps.LatLngBounds();
+        routePath.forEach(p => bounds.extend(p));
+        if (myLocation) bounds.extend(myLocation);
+        
+        // Timeout ensures GoogleMap has finished rendering layout
+        setTimeout(() => {
+            mapInstance.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+            setHasFitRoute(true);
+        }, 150);
+    }, [mapInstance, routePath, myLocation, hasFitRoute]);
+
+    // Pan map to rider ONLY IF we don't have a route to show
+    useEffect(() => {
+        if (mapInstance && myLocation && (!selectedRoute || !routePath)) {
+            mapInstance.panTo(myLocation);
+        }
+    }, [mapInstance, myLocation, selectedRoute, routePath]);
+
+    // Reset fit bounds trigger if selected route changes
+    useEffect(() => {
+        setHasFitRoute(false);
+    }, [selectedRoute]);
 
     // Fetch directions for selected route
     useEffect(() => {
@@ -572,6 +604,24 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
             setRoutePath(null);
             return;
         }
+
+        // If the route already has pre-defined points, use them directly instead of calling Directions API.
+        if (selectedRoute.points && selectedRoute.points.length > 0) {
+            setRoutePath(selectedRoute.points.map(p => ({ lat: Number(p.lat), lng: Number(p.lng) })));
+            return;
+        }
+
+        // Use precise server-provided polyline if available
+        if (selectedRoute.polyline && window.google?.maps?.geometry?.encoding) {
+            try {
+                const decodedPoints = window.google.maps.geometry.encoding.decodePath(selectedRoute.polyline);
+                setRoutePath(decodedPoints.map(p => ({ lat: p.lat(), lng: p.lng() })));
+                return;
+            } catch (err) {
+                console.warn("Failed to decode route polyline:", err);
+            }
+        }
+
         const origin = selectedRoute?.origin || selectedRoute?.fromLatLng || selectedRoute?.start;
         const destination = selectedRoute?.destination || selectedRoute?.toLatLng || selectedRoute?.end;
         if (!origin?.lat || !destination?.lat) return;
@@ -610,7 +660,17 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
         strokeWeight: 4,
     }), []);
 
-    const center = myLocation ?? ISRAEL_DEFAULT_CENTER;
+    const recordedPathOptions = useMemo(() => ({
+        strokeColor: "#3b82f6", // Blue color for recorded progress
+        strokeOpacity: 0.9,
+        strokeWeight: 4,
+    }), []);
+
+    // Strip extra properties like `t` just in case Google Maps API gets confused
+    const safeRecordedPath = useMemo(() => {
+        if (!recordedPath || !Array.isArray(recordedPath)) return [];
+        return recordedPath.map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
+    }, [recordedPath]);
 
     return (
         /*
@@ -639,8 +699,8 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
                     </div>
                 ) : (
                     <GoogleMap
-                        center={center}
-                        zoom={15}
+                        center={hasFitRoute ? undefined : center}
+                        zoom={hasFitRoute ? undefined : zoom}
                         mapContainerClassName="h-full w-full"
                         options={mapOptions}
                         onLoad={setMapInstance}
@@ -664,6 +724,10 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
                         )}
                         {routePath && routePath.length > 0 && (
                             <PolylineF path={routePath} options={polylineOptions} />
+                        )}
+                        {/* Always show recorded progress path if available */}
+                        {safeRecordedPath && safeRecordedPath.length >= 2 && (
+                            <PolylineF path={safeRecordedPath} options={recordedPathOptions} />
                         )}
                     </GoogleMap>
                 )}
@@ -703,46 +767,130 @@ export function MapPreview({ isMapLoaded, mapLoadError, selectedRoute, customCon
    ══════════════════════════════════════════════ */
 
 function NavigateSheet({ selectedRoute, onClose }) {
-    const wazeUrl = useMemo(() => {
+    // Navigate to Destination
+    const wazeDestUrl = useMemo(() => {
         const dest = selectedRoute?.destination || selectedRoute?.toLatLng || selectedRoute?.end;
         return dest?.lat
             ? `https://waze.com/ul?ll=${dest.lat},${dest.lng}&navigate=yes`
             : "https://waze.com/ul";
     }, [selectedRoute]);
 
-    const googleUrl = useMemo(() => {
+    const googleDestUrl = useMemo(() => {
         const dest = selectedRoute?.destination || selectedRoute?.toLatLng || selectedRoute?.end;
         return dest?.lat
             ? `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`
             : "https://maps.google.com/";
     }, [selectedRoute]);
 
+    // Navigate to Origin (Start point)
+    const wazeOriginUrl = useMemo(() => {
+        const origin = selectedRoute?.origin || selectedRoute?.fromLatLng || selectedRoute?.start;
+        return origin?.lat
+            ? `https://waze.com/ul?ll=${origin.lat},${origin.lng}&navigate=yes`
+            : "https://waze.com/ul";
+    }, [selectedRoute]);
+
+    const googleOriginUrl = useMemo(() => {
+        const origin = selectedRoute?.origin || selectedRoute?.fromLatLng || selectedRoute?.start;
+        return origin?.lat
+            ? `https://www.google.com/maps/dir/?api=1&destination=${origin.lat},${origin.lng}`
+            : "https://maps.google.com/";
+    }, [selectedRoute]);
+
+    // Open General App
+    const openApp = (url) => {
+        window.open(url, "_blank");
+        onClose();
+    };
+
     return (
         <div
-            className="absolute inset-x-4 bottom-24 z-10 overflow-hidden rounded-lg border"
-            style={{ background: "#0d1117", borderColor: "#1e293b" }}
+            className="absolute inset-x-4 bottom-24 z-10 overflow-hidden rounded-xl border flex flex-col shadow-2xl backdrop-blur-3xl"
+            style={{ background: "rgba(13,17,23,0.85)", borderColor: "#1e293b" }}
         >
-            <div className="border-b px-4 py-3" style={{ borderColor: "#1e293b" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-                    ניווט חיצוני
-                </p>
-            </div>
-            <div className="flex flex-col divide-y" style={{ "--tw-divide-opacity": 1 }}>
-                {[
-                    { label: "Waze", url: wazeUrl },
-                    { label: "Google Maps", url: googleUrl },
-                ].map(({ label, url }) => (
-                    <button
-                        key={label}
-                        type="button"
-                        onClick={() => { window.open(url, "_blank"); onClose(); }}
-                        className="flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-white/5 active:bg-white/10"
-                    >
-                        <span className="text-sm font-semibold text-white">{label}</span>
-                        <ExternalLink size={13} className="text-slate-500" strokeWidth={2} />
-                    </button>
-                ))}
-            </div>
+            {selectedRoute ? (
+                <>
+                    {/* -- Origin Navigation -- */}
+                    <div className="border-b px-4 py-2.5 bg-white/5" style={{ borderColor: "#1e293b" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#00FFA3]">
+                            נווט לנקודת ההתחלה
+                        </p>
+                    </div>
+                    <div className="flex divide-x divide-x-reverse" style={{ "--tw-divide-opacity": 0.1, borderColor: "#ffffff" }}>
+                        {[
+                            { label: "Waze", url: wazeOriginUrl },
+                            { label: "Google", url: googleOriginUrl },
+                        ].map(({ label, url }) => (
+                            <button
+                                key={`origin-${label}`}
+                                type="button"
+                                onClick={() => openApp(url)}
+                                className="flex flex-1 items-center justify-center gap-1.5 px-3 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
+                            >
+                                <span className="text-xs font-semibold text-white">{label}</span>
+                                <ExternalLink size={11} className="text-slate-500" strokeWidth={2} />
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* -- Destination Navigation -- */}
+                    <div className="border-b border-t px-4 py-2.5 bg-white/5 mt-1" style={{ borderColor: "#1e293b" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                            נווט לנקודת הסיום
+                        </p>
+                    </div>
+                    <div className="flex divide-x divide-x-reverse" style={{ "--tw-divide-opacity": 0.1, borderColor: "#ffffff" }}>
+                        {[
+                            { label: "Waze", url: wazeDestUrl },
+                            { label: "Google", url: googleDestUrl },
+                        ].map(({ label, url }) => (
+                            <button
+                                key={`dest-${label}`}
+                                type="button"
+                                onClick={() => openApp(url)}
+                                className="flex flex-1 items-center justify-center gap-1.5 px-3 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
+                            >
+                                <span className="text-xs font-semibold text-slate-300">{label}</span>
+                                <ExternalLink size={11} className="text-slate-500" strokeWidth={2} />
+                            </button>
+                        ))}
+                    </div>
+                </>
+            ) : (
+                <>
+                    {/* -- Free Ride Navigation -- */}
+                    <div className="border-b px-4 py-3" style={{ borderColor: "#1e293b" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#00FFA3]">
+                            פתח אפליקציית ניווט
+                        </p>
+                    </div>
+                    <div className="flex flex-col divide-y" style={{ "--tw-divide-opacity": 1, borderColor: "#1e293b" }}>
+                        {[
+                            { label: "Waze", url: "https://waze.com/ul" },
+                            { label: "Google Maps", url: "https://maps.google.com/" },
+                        ].map(({ label, url }) => (
+                            <button
+                                key={label}
+                                type="button"
+                                onClick={() => openApp(url)}
+                                className="flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-white/5 active:bg-white/10"
+                            >
+                                <span className="text-sm font-semibold text-white">{label}</span>
+                                <ExternalLink size={13} className="text-slate-500" strokeWidth={2} />
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+            
+            {/* Close Button */}
+            <button
+               onClick={onClose}
+               className="py-2.5 text-xs text-slate-500 font-medium hover:text-white hover:bg-white/5 transition border-t"
+               style={{ borderColor: "#1e293b" }}
+            >
+                סגור
+            </button>
         </div>
     );
 }
@@ -845,6 +993,7 @@ export default function RideActiveCockpit({
     currentSpeedKmh,
     maxSpeedKmh,
     gpsAccuracyPct,
+    recordedPath,
 }) {
     const [weather, setWeather] = useState({ temp: null, condition: null, isLoading: true, error: false });
 
@@ -886,6 +1035,7 @@ export default function RideActiveCockpit({
                     isMapLoaded={isMapLoaded}
                     mapLoadError={mapLoadError}
                     selectedRoute={selectedRoute}
+                    recordedPath={recordedPath}
                     customContainerClass="relative w-full h-full"
                     customContainerStyle={{}}
                     innerClassName="rounded-3xl overflow-hidden border border-white/10 shadow-lg relative w-full h-full"

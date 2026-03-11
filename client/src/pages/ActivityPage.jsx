@@ -15,7 +15,7 @@ import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 import { formatRideDuration } from "../app/utils/formatters";
 import { ISRAEL_DEFAULT_CENTER, ISRAEL_DEFAULT_ZOOM } from "../app/state/useAppState";
-import { Bike, Map as MapIcon, MapPin, Plus, Camera, Trash2, Timer } from "lucide-react";
+import { Bike, Map as MapIcon, MapPin, Plus, Camera, Trash2, Timer, Infinity, ChevronDown } from "lucide-react";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
 
@@ -39,6 +39,52 @@ const DARK_MAP_STYLE = [
 function imgSrc(url) {
     if (!url) return null;
     return url.startsWith("http") ? url : `${IMG_BASE}${url}`;
+}
+
+/* ─── CustomSelect ─────────────────────────────────────────────────── */
+
+function CustomSelect({ value, onChange, options, className, direction = "down" }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <div className={`relative flex flex-col ${className}`}>
+            <button
+                type="button"
+                className="w-full h-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/10 bg-black/40 backdrop-blur-md shadow-inner text-sm text-slate-100 hover:bg-white/5 transition-all text-right"
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+            >
+                <span>{value}</span>
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen && direction === "down" ? "rotate-180" : ""} ${direction === "up" ? "rotate-180" : ""} ${isOpen && direction === "up" ? "rotate-0" : ""}`} />
+            </button>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
+                    <div className={`absolute ${direction === "up" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"} right-0 w-full z-50 overflow-hidden rounded-xl border border-white/10 bg-[#0f172a]/95 backdrop-blur-3xl shadow-2xl`}>
+                        {options.map((opt) => (
+                            <button
+                                key={opt}
+                                type="button"
+                                className={`w-full text-right px-4 py-3 text-sm transition-colors hover:bg-white/10 ${value === opt ? "bg-[#00FFA3]/10 text-[#00FFA3] font-bold" : "text-slate-300"}`}
+                                onClick={(e) => { 
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onChange(opt); 
+                                    setIsOpen(false); 
+                                }}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
 }
 
 /* ─── ModalBackdrop ──────────────────────────────────────────────── */
@@ -158,16 +204,21 @@ function RouteDetailMap({ route, isMapLoaded, mapLoadError, isValidMapPoint, get
             zoom={ISRAEL_DEFAULT_ZOOM}
             onLoad={(m) => setMapInstance(m)}
             mapContainerClassName="h-full w-full"
-            options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" }}
+            options={{ 
+                styles: DARK_MAP_STYLE, 
+                disableDefaultUI: true, 
+                zoomControl: true, 
+                gestureHandling: "greedy" 
+            }}
         >
             {directionsResult ? (
                 <DirectionsRenderer
                     directions={directionsResult}
-                    options={{ polylineOptions: { strokeColor: "#14b8a6", strokeOpacity: 0.95, strokeWeight: 5 } }}
+                    options={{ polylineOptions: { strokeColor: "#00FFA3", strokeOpacity: 0.85, strokeWeight: 5 } }}
                 />
             ) : (
                 safePath.length >= 2 && (
-                    <PolylineF path={safePath} options={{ strokeColor: "#14b8a6", strokeOpacity: 0.95, strokeWeight: 5 }} />
+                    <PolylineF path={safePath} options={{ strokeColor: "#00FFA3", strokeOpacity: 0.85, strokeWeight: 5 }} />
                 )
             )}
             {origin && <MarkerF position={origin} title="התחלה" />}
@@ -380,7 +431,7 @@ function HistoryDetailModal({
 /* ─── RouteDetailModal ───────────────────────────────────────────── */
 
 function RouteDetailModal({
-    route, onClose,
+    route, onClose, onStartRide,
     isMapLoaded, mapLoadError, mapApiKey,
     isValidMapPoint, getSafePolylinePath, getRoutePolylinePath,
     setIsRideActive, setIsRidePaused, setIsRideMinimized, onNavigate,
@@ -397,7 +448,7 @@ function RouteDetailModal({
         setIsRideMinimized(false);
         setIsRideActive(true);
         onNavigate("ride", { source: "routeStart" });
-        onClose();
+        onStartRide(); // ONLY close the modal, keep selectedRoute intact
     };
 
     const handleDelete = async () => {
@@ -414,13 +465,13 @@ function RouteDetailModal({
     };
 
     return (
-        <ModalBackdrop onClose={onClose} className="bg-slate-950/80 backdrop-blur-2xl border border-white/10 shadow-2xl">
-            <div className="p-5 space-y-5">
+        <ModalBackdrop onClose={onClose} className="bg-[#0b1120]/90 backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] custom-scrollbar">
+            <div className="p-6 space-y-6">
                 {/* header */}
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-xl font-bold text-white drop-shadow-md">{route.title}</p>
-                        <p className="mt-1 text-xs text-slate-400 font-medium">{route.from} → {route.to}</p>
+                        <p className="text-2xl font-black text-white tracking-tight drop-shadow-md">{route.title}</p>
+                        <p className="mt-1.5 text-xs text-slate-400 font-semibold">{route.from} &rarr; {route.to}</p>
                     </div>
                     <button type="button" onClick={onClose} className="rounded-full bg-white/5 p-2 text-slate-400 hover:text-white hover:bg-white/10 transition backdrop-blur-md">✕</button>
                 </div>
@@ -434,8 +485,15 @@ function RouteDetailModal({
 
                 {/* map */}
                 {mapApiKey?.trim() && (
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-sm backdrop-blur-md">
-                        <div className="h-[220px]">
+                    <div className="overflow-hidden rounded-3xl border border-white/10 shadow-2xl relative">
+                         {/* Seamless inner glass effect overlay over the map edges */}
+                        <div
+                            className="pointer-events-none absolute inset-0 z-10"
+                            style={{
+                                background: "radial-gradient(circle at center, transparent 30%, rgba(11,17,32,0.8) 120%)",
+                            }}
+                        />
+                        <div className="h-[240px]">
                             <RouteDetailMap
                                 route={route}
                                 isMapLoaded={isMapLoaded}
@@ -448,54 +506,72 @@ function RouteDetailModal({
                     </div>
                 )}
 
-                {/* stats */}
+                {deleteError && <p className="text-xs font-medium text-rose-400 text-center">{deleteError}</p>}
+
+                {/* Glass stats grid */}
                 <div className="grid grid-cols-3 gap-3">
                     {[
                         ["מרחק", `${route.distanceKm} ק״מ`],
                         ["זמן", `${route.etaMin} דק׳`],
                         ["סוג", routeStyle],
                     ].map(([label, val]) => (
-                        <div key={label} className="rounded-xl border border-white/5 bg-white/5 p-3 text-center shadow-sm backdrop-blur-md">
-                            <p className="text-[11px] text-slate-400 font-medium">{label}</p>
-                            <p className="mt-1 text-sm font-bold text-slate-100">{val}</p>
+                        <div key={label} className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-white/5 py-4 px-2 shadow-sm backdrop-blur-md">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</p>
+                            <p className="mt-1.5 text-[15px] font-bold text-white tracking-wide">{val}</p>
                         </div>
                     ))}
                 </div>
 
                 {/* elements grid (Difficulty & Twisty) */}
-                <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm">
+                <div className="flex flex-wrap gap-2 pt-1 border-t border-white/5">
+                    <span className="rounded-full bg-[#00FFA3]/10 border border-[#00FFA3]/30 px-3.5 py-1.5 text-[11px] uppercase tracking-wider font-bold text-[#00FFA3] shadow-sm backdrop-blur-sm">
                         קושי: {routeDifficulty}
                     </span>
                     {route?.isTwisty && (
-                        <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-sm font-medium text-amber-300 shadow-sm backdrop-blur-sm">
-                            〜 מפותל
+                        <span className="flex items-center gap-1.5 rounded-full bg-[#00FFA3]/10 border border-[#00FFA3]/30 px-3.5 py-1 text-[11px] uppercase tracking-wider font-bold text-[#00FFA3] shadow-sm backdrop-blur-sm">
+                            מפותל <Infinity size={14} strokeWidth={2.5} />
                         </span>
                     )}
                 </div>
 
                 {/* note */}
                 {routeNote && (
-                    <div className="rounded-xl border border-white/5 bg-white/5 p-4 backdrop-blur-md shadow-sm">
-                        <p className="text-xs font-semibold text-slate-400 mb-1.5">הערות על המסלול</p>
-                        <p className="text-sm text-slate-200 leading-relaxed">{routeNote}</p>
+                    <div className="rounded-2xl border border-white/5 bg-white/5 p-5 backdrop-blur-xl shadow-sm">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">הערות על המסלול</p>
+                        <p className="text-sm text-slate-300 leading-relaxed">{routeNote}</p>
                     </div>
                 )}
 
-                {deleteError && <p className="text-xs font-medium text-rose-400 text-center">{deleteError}</p>}
-
-                {/* actions */}
-                <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        onClick={handleStart}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
-                    >התחל רכיבה <Bike className="w-5 h-5" /></button>
+                {/* Premium Actions Glass Pill */}
+                <div
+                    className="flex items-center gap-2.5 rounded-full border border-white/10 px-3 py-3 mt-4 transition-all duration-300"
+                    style={{
+                        background: "linear-gradient(180deg, rgba(11,19,43,0.7), rgba(11,19,43,0.9))",
+                        backdropFilter: "blur(32px)",
+                        WebkitBackdropFilter: "blur(32px)",
+                        boxShadow: "0 10px 40px rgba(0,0,0,0.6), 0 -1px 0 rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.05)",
+                    }}
+                >
                     <button
                         type="button"
                         onClick={handleDelete}
-                        className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-6 py-3.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 transition backdrop-blur-sm"
-                    >מחק</button>
+                        className="flex items-center justify-center rounded-full px-5 py-3.5 text-sm font-semibold transition-all hover:bg-white/10 active:scale-95"
+                    >
+                        <Trash2 size={16} strokeWidth={2} className="text-rose-400" />
+                    </button>
+                    
+                    <button
+                        type="button"
+                        onClick={handleStart}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 text-sm font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 bg-gradient-to-r from-emerald-500 to-teal-400"
+                        style={{
+                            color: "#020617",
+                            boxShadow: `0 0 15px rgba(16,185,129,0.4), inset 0 2px 4px rgba(255,255,255,0.4)`,
+                        }}
+                    >
+                        התחל רכיבה
+                        <Bike size={16} strokeWidth={2.5} />
+                    </button>
                 </div>
             </div>
         </ModalBackdrop>
@@ -631,87 +707,102 @@ function AddRouteModal({
         }
     };
 
-    const inputCls = "w-full rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-inner px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300";
+    const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 backdrop-blur-md shadow-inner px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00FFA3]/50 transition-all";
 
     return (
-        <ModalBackdrop onClose={onClose}>
-            <div className="p-5 space-y-4">
+        <ModalBackdrop onClose={onClose} className="bg-[#0b1120]/90 backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] custom-scrollbar">
+            <div className="p-6 space-y-6">
                 {/* header */}
-                <div className="flex items-center justify-between">
-                    <p className="text-base font-semibold text-slate-100 flex items-center gap-2"><Plus className="w-5 h-5 text-emerald-400" /> הוסף מסלול חדש</p>
-                    <button type="button" onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:text-white hover:bg-white/10 transition">✕</button>
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-2xl font-black text-white tracking-tight drop-shadow-md flex items-center gap-2">
+                            <Plus className="w-6 h-6 text-[#00FFA3]" strokeWidth={3} />
+                            הוסף מסלול
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400 font-semibold">צור נתיב חדש ושמור אותו באוסף שלך</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="rounded-full bg-white/5 p-2 text-slate-400 hover:text-white hover:bg-white/10 transition backdrop-blur-md">✕</button>
                 </div>
 
                 {/* route title */}
                 <input type="text" value={newRouteTitle} onChange={(e) => setNewRouteTitle(e.target.value)} placeholder="שם מסלול" className={inputCls} />
 
-                {/* origin */}
-                <div className="space-y-1">
-                    <label className="text-xs text-slate-400">מוצא</label>
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                value={newOriginLabel}
-                                onFocus={() => setActiveSuggestionField("from")}
-                                onChange={(e) => { setNewOriginLabel(e.target.value); setActiveSuggestionField("from"); }}
-                                placeholder="חפש מוצא..."
-                                className={inputCls}
-                            />
-                            {isPlacesApiReady && activeSuggestionField === "from" && originSuggestions.length > 0 && (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl">
-                                    {originSuggestions.slice(0, 5).map((s) => (
-                                        <button key={s.place_id} type="button"
-                                            onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => applySuggestion("from", s)}
-                                            className="block w-full border-b border-white/5 px-3 py-2 text-right text-sm text-slate-100 transition hover:bg-white/10 last:border-b-0"
-                                        >{s.description}</button>
-                                    ))}
-                                </div>
-                            )}
+                {/* origin / destination cards */}
+                <div className="space-y-3">
+                    {/* Origin */}
+                    <div className="rounded-2xl border border-white/5 bg-white/5 p-4 backdrop-blur-xl shadow-sm space-y-2 relative">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-[#00FFA3]">מוצא</label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <input
+                                    type="text"
+                                    value={newOriginLabel}
+                                    onFocus={() => setActiveSuggestionField("from")}
+                                    onChange={(e) => { setNewOriginLabel(e.target.value); setActiveSuggestionField("from"); }}
+                                    placeholder="חפש מוצא..."
+                                    className={inputCls}
+                                />
+                                {isPlacesApiReady && activeSuggestionField === "from" && originSuggestions.length > 0 && (
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0f172a] shadow-2xl">
+                                        {originSuggestions.slice(0, 5).map((s) => (
+                                            <button key={s.place_id} type="button"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => applySuggestion("from", s)}
+                                                className="block w-full border-b border-white/5 px-4 py-3 text-right text-sm text-slate-300 hover:text-white transition hover:bg-white/10 last:border-b-0"
+                                            >{s.description}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button type="button" onClick={() => openMapPicker("from")} className="flex items-center justify-center shrink-0 rounded-xl bg-white/5 border border-white/10 aspect-square w-12 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><MapPin size={20} strokeWidth={2} /></button>
                         </div>
-                        <button type="button" onClick={() => openMapPicker("from")} className="flex items-center gap-1.5 shrink-0 rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white transition"><MapPin className="w-4 h-4" /> מפה</button>
                     </div>
-                </div>
 
-                {/* destination */}
-                <div className="space-y-1">
-                    <label className="text-xs text-slate-400">יעד</label>
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                value={newDestinationLabel}
-                                onFocus={() => setActiveSuggestionField("to")}
-                                onChange={(e) => { setNewDestinationLabel(e.target.value); setActiveSuggestionField("to"); }}
-                                placeholder="חפש יעד..."
-                                className={inputCls}
-                            />
-                            {isPlacesApiReady && activeSuggestionField === "to" && destinationSuggestions.length > 0 && (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl">
-                                    {destinationSuggestions.slice(0, 5).map((s) => (
-                                        <button key={s.place_id} type="button"
-                                            onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => applySuggestion("to", s)}
-                                            className="block w-full border-b border-white/5 px-3 py-2 text-right text-sm text-slate-100 transition hover:bg-white/10 last:border-b-0"
-                                        >{s.description}</button>
-                                    ))}
-                                </div>
-                            )}
+                    {/* Destination */}
+                    <div className="rounded-2xl border border-white/5 bg-white/5 p-4 backdrop-blur-xl shadow-sm space-y-2 relative">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-400">יעד</label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <input
+                                    type="text"
+                                    value={newDestinationLabel}
+                                    onFocus={() => setActiveSuggestionField("to")}
+                                    onChange={(e) => { setNewDestinationLabel(e.target.value); setActiveSuggestionField("to"); }}
+                                    placeholder="חפש יעד..."
+                                    className={inputCls}
+                                />
+                                {isPlacesApiReady && activeSuggestionField === "to" && destinationSuggestions.length > 0 && (
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0f172a] shadow-2xl">
+                                        {destinationSuggestions.slice(0, 5).map((s) => (
+                                            <button key={s.place_id} type="button"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => applySuggestion("to", s)}
+                                                className="block w-full border-b border-white/5 px-4 py-3 text-right text-sm text-slate-300 hover:text-white transition hover:bg-white/10 last:border-b-0"
+                                            >{s.description}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button type="button" onClick={() => openMapPicker("to")} className="flex items-center justify-center shrink-0 rounded-xl bg-white/5 border border-white/10 aspect-square w-12 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><MapPin size={20} strokeWidth={2} /></button>
                         </div>
-                        <button type="button" onClick={() => openMapPicker("to")} className="flex items-center gap-1.5 shrink-0 rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white transition"><MapPin className="w-4 h-4" /> מפה</button>
                     </div>
                 </div>
 
                 {/* inline map picker */}
                 {activeMapPickField && mapApiKey?.trim() && (
-                    <div className="space-y-2">
+                    <div className="rounded-2xl border border-white/5 bg-white/5 p-4 backdrop-blur-xl shadow-sm space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-xs text-slate-400">לחץ על המפה לבחירת {activeMapPickField === "from" ? "מוצא" : "יעד"}</p>
-                            <button type="button" onClick={closeMapPicker} className="text-xs text-slate-400 hover:text-white transition">סגור מפה</button>
+                            <p className="text-[10px] uppercase font-bold text-[#00FFA3]">
+                                בחירת {activeMapPickField === "from" ? "מוצא" : "יעד"} במפה
+                            </p>
+                            <button type="button" onClick={closeMapPicker} className="text-xs text-slate-400 hover:text-white transition font-medium">סגור מפה</button>
                         </div>
                         {isMapLoaded && !mapLoadError ? (
-                            <div className="h-56 overflow-hidden rounded-xl border border-white/10">
+                            <div className="h-64 overflow-hidden rounded-xl border border-white/10 shadow-inner relative">
+                                <div
+                                    className="pointer-events-none absolute inset-0 z-10"
+                                    style={{ background: "radial-gradient(circle at center, transparent 30%, rgba(11,17,32,0.8) 120%)" }}
+                                />
                                 <GoogleMap
                                     center={mapPickCenter}
                                     zoom={11}
@@ -726,56 +817,65 @@ function AddRouteModal({
                                         else { setNewDestinationLatLng(point); setNewDestinationLabel("נקודה נבחרה"); }
                                         setNewRouteLocationError("");
                                     }}
-                                    options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" }}
+                                    options={{ styles: DARK_MAP_STYLE, disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" }}
                                 >
                                     {newOriginLatLng && <MarkerF position={newOriginLatLng} title="מוצא" />}
                                     {newDestinationLatLng && <MarkerF position={newDestinationLatLng} title="יעד" />}
                                 </GoogleMap>
                             </div>
                         ) : (
-                            <p className="text-sm text-slate-400">{mapLoadError ? "שגיאה בטעינת מפה" : "טוען מפה..."}</p>
+                            <p className="text-sm text-slate-400 text-center py-5">{mapLoadError ? "שגיאה בטעינת מפה" : "טוען מפה..."}</p>
                         )}
-                        {mapPickStatus && <p className="text-xs text-amber-300">{mapPickStatus}</p>}
+                        {mapPickStatus && <p className="text-[11px] font-semibold text-amber-300 text-center">{mapPickStatus}</p>}
                     </div>
                 )}
 
                 {/* type + difficulty + twisty */}
-                <div className="grid grid-cols-3 gap-2">
-                    <label className="flex flex-col gap-1 text-xs text-slate-400">
-                        <span>סוג מסלול</span>
-                        <select value={newRouteType} onChange={(e) => setNewRouteType(e.target.value)} className={inputCls}>
-                            <option value="עירוני">עירוני</option>
-                            <option value="בין־עירוני">בין־עירוני</option>
-                            <option value="שטח">שטח</option>
-                            <option value="נוף">נוף</option>
-                        </select>
-                    </label>
-                    <label className="flex flex-col gap-1 text-xs text-slate-400">
-                        <span>קושי</span>
-                        <select value={newRouteDifficulty} onChange={(e) => setNewRouteDifficulty(e.target.value)} className={inputCls}>
-                            <option value="קל">קל</option>
-                            <option value="בינוני">בינוני</option>
-                            <option value="קשה">קשה</option>
-                        </select>
-                    </label>
-                    <label className="flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-xs text-slate-200 cursor-pointer">
+                <div className="grid grid-cols-3 gap-3 pt-2 h-[88px]">
+                    <div className="flex flex-col gap-1.5 h-full relative z-50">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">סוג</span>
+                        <CustomSelect 
+                            value={newRouteType} 
+                            onChange={setNewRouteType} 
+                            options={["עירוני", "בין־עירוני", "שטח", "נוף"]} 
+                            className="flex-1"
+                            direction="up"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5 h-full relative z-40">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">קושי</span>
+                        <CustomSelect 
+                            value={newRouteDifficulty} 
+                            onChange={setNewRouteDifficulty} 
+                            options={["קל", "בינוני", "קשה"]} 
+                            className="flex-1"
+                            direction="up"
+                        />
+                    </div>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/5 py-3 cursor-pointer hover:bg-white/10 transition group mt-[22px] z-10">
                         <input type="checkbox" checked={newRouteIsTwisty} onChange={(e) => {
                             const v = e.target.checked;
                             setNewRouteIsTwisty(v);
                             if (v) setNewRouteDifficulty(getAdjustedDifficultyForTwisty(newRouteDifficulty));
-                        }} className="h-4 w-4 rounded border-white/20 text-emerald-400" />
-                        מפותל
+                        }} className="h-5 w-5 rounded border-none bg-black/50 text-[#00FFA3] focus:ring-0 cursor-pointer" />
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-300 group-hover:text-white transition">מפותל <Infinity size={14} strokeWidth={2.5} /></span>
                     </label>
                 </div>
 
-                {newRouteLocationError && <p className="text-xs text-rose-300">{newRouteLocationError}</p>}
+                {newRouteLocationError && <p className="text-xs font-semibold text-rose-400 text-center mt-2">{newRouteLocationError}</p>}
 
                 {/* submit */}
                 <button
                     type="button"
                     onClick={handleSubmit}
-                    className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white hover:bg-emerald-400 transition"
-                >שמור מסלול ✓</button>
+                    className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-black uppercase tracking-widest transition-all hover:brightness-110 active:scale-95 bg-gradient-to-r from-emerald-500 to-teal-400 mt-4"
+                    style={{
+                        color: "#020617",
+                        boxShadow: "0 0 20px rgba(16,185,129,0.3), inset 0 2px 4px rgba(255,255,255,0.4)"
+                    }}
+                >
+                    שמור מסלול חדש
+                </button>
             </div>
         </ModalBackdrop>
     );
@@ -1094,6 +1194,7 @@ export default function ActivityPage({
                 <RouteDetailModal
                     route={modalRoute}
                     onClose={() => { setModalRoute(null); setSelectedRoute(null); }}
+                    onStartRide={() => { setModalRoute(null); }}
                     isMapLoaded={isMapLoaded}
                     mapLoadError={mapLoadError}
                     mapApiKey={mapApiKey}
