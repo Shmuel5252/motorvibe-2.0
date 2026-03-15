@@ -367,6 +367,47 @@ export default function HistoryPage({
 
         {/* רשימת רכיבות אחרונות */}
         <section className="mt-6 space-y-4">
+          {visibleHistoryRides.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-5 py-16 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/4">
+                {/* Helmet icon */}
+                <svg
+                  className="h-10 w-10 text-slate-500"
+                  fill="none"
+                  viewBox="0 0 64 64"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M32 8C19 8 10 18 10 30c0 8 4 14 10 18v4h24v-4c6-4 10-10 10-18 0-12-9-22-22-22z" />
+                  <path d="M10 32h8M46 32h8" />
+                  <path d="M20 48h24" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-slate-100">
+                  {searchQuery.trim()
+                    ? "לא נמצאו תוצאות"
+                    : "הגיע הזמן לרכיבה הראשונה!"}
+                </p>
+                <p className="mt-1.5 text-sm text-slate-400">
+                  {searchQuery.trim()
+                    ? "נסה לחפש מילה אחרת"
+                    : "כל הרכיבות שלך יופיעו כאן לאחר שתתחיל לרכוב"}
+                </p>
+              </div>
+              {!searchQuery.trim() && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.("ride")}
+                  className="rounded-full bg-linear-to-r from-emerald-500 to-teal-400 px-7 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(16,185,129,0.25)] transition-all hover:scale-105 active:scale-95"
+                >
+                  התחל רכיבה עכשיו
+                </button>
+              )}
+            </div>
+          )}
           {visibleHistoryRides.map((ride) => (
             <GlassCard
               key={ride.id}

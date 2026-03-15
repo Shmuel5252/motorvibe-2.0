@@ -436,8 +436,11 @@ function App() {
           return (
             <ProfilePage
               currentUser={state.currentUser}
+              historyRides={state.historyRides}
               onLogout={state.handleLogout}
               onNavigate={navigateTo}
+              onUpdateProfile={state.updateProfile}
+              apiClient={state.apiClient}
             />
           );
         }

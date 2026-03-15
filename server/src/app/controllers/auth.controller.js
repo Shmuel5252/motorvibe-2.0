@@ -14,6 +14,7 @@ function publicUser(userDoc) {
     email: userDoc.email,
     role: userDoc.role,
     createdAt: userDoc.createdAt,
+    avatarUrl: userDoc.avatarUrl || null,
   };
 }
 
@@ -101,4 +102,22 @@ function googleCallback(req, res) {
   return res.redirect(`${frontendUrl}/?token=${token}`);
 }
 
-module.exports = { register, login, me, googleCallback };
+async function updateProfile(req, res) {
+  const { name, avatarUrl } = req.body;
+  const updates = {};
+  if (name && typeof name === "string") {
+    const trimmed = name.trim();
+    if (trimmed.length >= 2 && trimmed.length <= 50) {
+      updates.name = trimmed;
+    }
+  }
+  if (avatarUrl !== undefined) {
+    updates.avatarUrl = avatarUrl || null;
+  }
+  const user = await User.findByIdAndUpdate(req.user._id, updates, {
+    new: true,
+  });
+  return res.json({ user: publicUser(user) });
+}
+
+module.exports = { register, login, me, googleCallback, updateProfile };

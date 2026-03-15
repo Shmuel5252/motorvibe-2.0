@@ -28,6 +28,9 @@ router.post(
 // GET /api/auth/me (protected)
 router.get("/me", authMiddleware, authController.me);
 
+// PATCH /api/auth/profile (protected)
+router.patch("/profile", authMiddleware, authController.updateProfile);
+
 // GET /api/auth/google — redirect to Google consent screen
 router.get(
   "/google",

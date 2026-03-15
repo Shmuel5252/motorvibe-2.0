@@ -225,7 +225,7 @@ export default function HomePage({
         </section>
       </main>
 
-      {/* פס סטטיסטיקות תחתון */}
+      {/* כרטיסי סטטיסטיקות */}
       {(() => {
         const totalRides = historyRides.length;
         const totalKm = historyRides.reduce(
@@ -237,25 +237,93 @@ export default function HomePage({
           0,
         );
 
+        const stats = [
+          {
+            label: "רכיבות",
+            value: totalRides,
+            display: totalRides.toLocaleString("he-IL"),
+            icon: (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                />
+              </svg>
+            ),
+            accent: "text-emerald-400",
+            glow: "shadow-emerald-500/10",
+          },
+          {
+            label: "שעות נסיעה",
+            value: totalSeconds,
+            display: totalSeconds > 0 ? formatRideDuration(totalSeconds) : "--",
+            icon: (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            ),
+            accent: "text-teal-400",
+            glow: "shadow-teal-500/10",
+          },
+          {
+            label: 'ק"מ סה"כ',
+            value: totalKm,
+            display: parseFloat(totalKm.toFixed(1)).toLocaleString("he-IL"),
+            icon: (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+            ),
+            accent: "text-cyan-400",
+            glow: "shadow-cyan-500/10",
+          },
+        ];
+
         return (
-          <section className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full shadow-lg mx-4 mt-6 px-4 py-3 sm:mx-6">
-            <div className="flex items-center justify-between gap-2 text-sm text-gray-400">
-              <span>
-                <span className="text-emerald-400 font-bold">{totalRides}</span>{" "}
-                רכיבות
-              </span>
-              <span className="text-white/20">|</span>
-              <span className="text-emerald-400 font-bold">
-                {totalSeconds != null ? formatRideDuration(totalSeconds) : "--"}
-              </span>
-              <span className="text-white/20">|</span>
-              <span>
-                <span className="text-emerald-400 font-bold">
-                  {totalKm != null ? parseFloat(totalKm.toFixed(1)) : "--"}
-                </span>{" "}
-                ק״מ
-              </span>
-            </div>
+          <section className="mx-4 mt-6 grid grid-cols-3 gap-3 sm:mx-6">
+            {stats.map((s) => (
+              <div
+                key={s.label}
+                className={`flex flex-col items-center justify-center rounded-2xl border border-white/8 bg-white/4 backdrop-blur-md px-3 py-4 shadow-lg ${s.glow}`}
+              >
+                <span className={`mb-1.5 ${s.accent}`}>{s.icon}</span>
+                <span
+                  className={`text-xl font-bold tabular-nums leading-none ${s.accent}`}
+                >
+                  {s.display}
+                </span>
+                <span className="mt-1.5 text-[10px] font-medium uppercase tracking-widest text-slate-500">
+                  {s.label}
+                </span>
+              </div>
+            ))}
           </section>
         );
       })()}

@@ -1058,25 +1058,84 @@ export default function MyBikePage({
               </GlassCard>
             </section>
 
-            <section className="mt-3 flex flex-wrap gap-2">
-              <span className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full shadow-lg px-3 py-1 text-xs text-gray-400">
-                ק״מ:{" "}
-                <span className="text-emerald-400 font-bold">
-                  {bike.currentOdometerKm?.toLocaleString("he-IL") ?? "--"}
+            <section className="mt-4">
+              {/* Odometer badge */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 text-xs text-gray-400">
+                  ק״מ נוכחי:{" "}
+                  <span className="text-emerald-400 font-bold">
+                    {bike.currentOdometerKm?.toLocaleString("he-IL") ?? "--"}
+                  </span>
                 </span>
-              </span>
-              {bike.mileageAlerts?.map((a, i) => (
-                <span
-                  key={i}
-                  className="bg-white/5 backdrop-blur-md border border-amber-500/30 rounded-full shadow-lg px-3 py-1 text-xs text-gray-400"
-                >
-                  {TYPE_ICONS[a.type] ?? "🔔"} {a.type}:{" "}
-                  <span className="text-amber-400 font-bold">
-                    {Number(a.targetKm).toLocaleString("he-IL")}
-                  </span>{" "}
-                  ק״מ
-                </span>
-              ))}
+              </div>
+
+              {/* Mileage alert progress cards */}
+              {bike.mileageAlerts?.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {bike.mileageAlerts.map((a, i) => {
+                    const current = bike.currentOdometerKm ?? 0;
+                    const target = Number(a.targetKm);
+                    const pct = Math.min((current / target) * 100, 100);
+                    const remaining = Math.max(target - current, 0);
+                    const isRed = pct >= 90;
+                    const isAmber = pct >= 80 && pct < 90;
+                    const barColor = isRed
+                      ? "bg-rose-500"
+                      : isAmber
+                        ? "bg-amber-400"
+                        : "bg-emerald-400";
+                    const textColor = isRed
+                      ? "text-rose-400"
+                      : isAmber
+                        ? "text-amber-400"
+                        : "text-emerald-400";
+                    return (
+                      <div
+                        key={i}
+                        className={`rounded-xl border px-4 py-3 bg-white/4 backdrop-blur-sm transition-colors ${
+                          isRed
+                            ? "border-rose-500/30"
+                            : isAmber
+                              ? "border-amber-500/30"
+                              : "border-white/8"
+                        }`}
+                      >
+                        {/* Header row */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                            <span>{TYPE_ICONS[a.type] ?? "◇"}</span>
+                            {a.type}
+                          </span>
+                          <span
+                            className={`text-xs font-bold tabular-nums ${textColor}`}
+                          >
+                            {pct.toFixed(0)}%
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {/* Footer row */}
+                        <div className="mt-1.5 flex justify-between text-[10px] text-slate-500 tabular-nums">
+                          <span>{current.toLocaleString("he-IL")} ק״מ</span>
+                          <span>
+                            נותרו {remaining.toLocaleString("he-IL")} ק״מ
+                          </span>
+                        </div>
+                        {a.note && (
+                          <p className="mt-1.5 text-[10px] text-slate-400 truncate">
+                            {a.note}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
 
             {/* ─── רשומות תחזוקה ─── */}

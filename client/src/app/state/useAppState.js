@@ -169,6 +169,7 @@ export default function useAppState() {
     isAuthSubmitting: auth.isAuthSubmitting,
     handleLogout: auth.handleLogout,
     handleUnauthorized: auth.handleUnauthorized,
+    updateProfile: auth.updateProfile,
     submitAuthForm,
 
     /* Routes */

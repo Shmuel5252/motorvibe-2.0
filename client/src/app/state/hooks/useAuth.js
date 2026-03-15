@@ -246,5 +246,13 @@ export default function useAuth(apiClient) {
     handleUnauthorized,
     applyAuthSuccess,
     submitAuthForm,
+    updateProfile: async (data) => {
+      const { data: res } = await apiClient.patch("/auth/profile", data);
+      if (res?.user) {
+        setCurrentUser(res.user);
+        window.sessionStorage.setItem("mv_user", JSON.stringify(res.user));
+      }
+      return res?.user ?? null;
+    },
   };
 }

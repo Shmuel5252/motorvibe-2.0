@@ -7,9 +7,17 @@
  * @param {React.ReactNode} props.children - תוכן פנימי של הכרטיס.
  * @returns {JSX.Element} בלוק section בסגנון glass.
  */
-function GlassCard({ title, right, className = "", children }) {
+function GlassCard({ title, right, className = "", children, onClick }) {
+  const isClickable = typeof onClick === "function";
   return (
-    <section className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg p-5 ${className}`.trim()}>
+    <section
+      onClick={onClick}
+      className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg p-5 ${
+        isClickable
+          ? "cursor-pointer transition-all hover:bg-white/8 hover:border-white/15 active:scale-[0.98]"
+          : ""
+      } ${className}`.trim()}
+    >
       {/* כותרת אופציונלית: מוצגת רק אם יש title או right */}
       {(title || right) && (
         <header className="mb-4 flex items-center justify-between">
