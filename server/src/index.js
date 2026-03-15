@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
 const connectDB = require("./config/db");
+const passport = require("./config/passport");
 
 const healthRoutes = require("./app/routes/health.routes");
 
@@ -25,6 +26,7 @@ const app = express();
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
 
 // Serve static files from the public directory (for uploads)
 app.use(express.static(path.join(__dirname, "../public")));

@@ -13,18 +13,26 @@ const AUTH_TOKEN_KEY = "mv_token";
  */
 export default function useAuth(apiClient) {
   /* ─── State: Auth ─── */
-  const [authToken, setAuthToken] = useState(() => window.sessionStorage.getItem("mv_token") || "");
+  const [authToken, setAuthToken] = useState(
+    () => window.sessionStorage.getItem("mv_token") || "",
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   /* אתחול מקדים של currentUser מ-sessionStorage כדי למנוע flash בשם המשתמש */
   const [currentUser, setCurrentUser] = useState(() => {
     if (typeof window === "undefined") return null;
     const raw = window.sessionStorage.getItem("mv_user");
     if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   });
   /* מציג מסך אימות מיד אם אין טוקן שמור — ללא רציפת flash */
   const [showAuthScreen, setShowAuthScreen] = useState(
-    () => typeof window !== "undefined" && !window.sessionStorage.getItem(AUTH_TOKEN_KEY)
+    () =>
+      typeof window !== "undefined" &&
+      !window.sessionStorage.getItem(AUTH_TOKEN_KEY),
   );
   const [authMode, setAuthMode] = useState("login");
   const [authName, setAuthName] = useState("");
@@ -99,6 +107,34 @@ export default function useAuth(apiClient) {
       return;
     }
 
+    // טיפול בטוקן שחוזר מ-Google OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("token");
+    const authError = params.get("auth_error");
+
+    if (urlToken) {
+      // נקה מה-URL מידית כדי שלא ישאר ב-history
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      applyAuthSuccess(urlToken);
+      // טען פרטי משתמש מהשרת
+      apiClient
+        .get("/auth/me", { headers: { Authorization: `Bearer ${urlToken}` } })
+        .then(({ data }) => {
+          if (data?.user) {
+            setCurrentUser(data.user);
+            window.sessionStorage.setItem("mv_user", JSON.stringify(data.user));
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
+    if (authError) {
+      setAuthError("התחברות עם Google נכשלה, נסה שוב");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const storedToken = window.sessionStorage.getItem(AUTH_TOKEN_KEY) || "";
     if (!storedToken) {
       setIsAuthenticated(false);
@@ -164,14 +200,18 @@ export default function useAuth(apiClient) {
     } catch (error) {
       console.error("Auth failed", error);
       const backendError = error.response?.data?.message;
-      let errorMessage = authMode === "register"
-        ? "שגיאה בהרשמה. בדוק פרטים ונסה שוב."
-        : "התחברות נכשלה. בדוק פרטים ונסה שוב.";
+      let errorMessage =
+        authMode === "register"
+          ? "שגיאה בהרשמה. בדוק פרטים ונסה שוב."
+          : "התחברות נכשלה. בדוק פרטים ונסה שוב.";
 
       if (backendError) {
         if (backendError.toLowerCase().includes("already exists")) {
           errorMessage = "משתמש עם אימייל זה כבר קיים";
-        } else if (backendError.toLowerCase().includes("invalid credentials") || backendError.toLowerCase().includes("wrong password")) {
+        } else if (
+          backendError.toLowerCase().includes("invalid credentials") ||
+          backendError.toLowerCase().includes("wrong password")
+        ) {
           errorMessage = "אימייל או סיסמה שגויים";
         } else if (backendError.toLowerCase().includes("not found")) {
           errorMessage = "משתמש לא נמצא";
@@ -191,11 +231,16 @@ export default function useAuth(apiClient) {
     isAuthenticated,
     currentUser,
     showAuthScreen,
-    authMode, setAuthMode,
-    authName, setAuthName,
-    authEmail, setAuthEmail,
-    authPassword, setAuthPassword,
-    authError, setAuthError,
+    authMode,
+    setAuthMode,
+    authName,
+    setAuthName,
+    authEmail,
+    setAuthEmail,
+    authPassword,
+    setAuthPassword,
+    authError,
+    setAuthError,
     isAuthSubmitting,
     handleLogout,
     handleUnauthorized,
