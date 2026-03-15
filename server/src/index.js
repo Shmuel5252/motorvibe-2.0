@@ -48,10 +48,22 @@ app.use("/api/upload", uploadRoutes);
 
 app.use("/api/events", eventsRoutes);
 
-// 404 handler (minimal)
+// 404 handler
 app.use((req, res) => {
   return res.status(404).json({
     error: { code: "NOT_FOUND", message: "Not found" },
+  });
+});
+
+// Global error handler — must have 4 params so Express recognises it as an error handler
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error("[unhandled]", err);
+  return res.status(500).json({
+    error: {
+      code: "INTERNAL_ERROR",
+      message: err.message || "Unexpected server error",
+    },
   });
 });
 

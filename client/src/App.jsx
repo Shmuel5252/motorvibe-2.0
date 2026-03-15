@@ -9,7 +9,7 @@
  * ללא React Router — הניווט מבוסס activeTab שמנוהל ב-AppShell.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import useAppState from "./app/state/useAppState";
 import AppShell from "./app/layouts/AppShell";
 import HomePage from "./pages/HomePage";
@@ -67,6 +67,12 @@ function BikeTabLoader({ activeTab, isAuthenticated, onLoad }) {
 function App() {
   /* כל ה-state וה-handlers של האפליקציה מגיעים מ-useAppState. */
   const state = useAppState();
+
+  /* route pending open from community hub */
+  const [communityPendingRoute, setCommunityPendingRoute] = useState(null);
+
+  /* tab to jump to inside CommunityHubPage (e.g. "events" after creating a ride) */
+  const [communityPendingTab, setCommunityPendingTab] = useState(null);
 
   /* הידרציה בעת הטעינה: Promise.all לטעינה מקבילה ו-isInitializing=false בסיום */
   useEffect(() => {
@@ -359,6 +365,15 @@ function App() {
                 searchQuery={state.searchQuery}
                 setSearchQuery={state.setSearchQuery}
                 fetchHistoryFromServer={state.fetchHistoryFromServer}
+                currentUserId={
+                  state.currentUser?.id ?? state.currentUser?._id ?? ""
+                }
+                communityPendingRoute={communityPendingRoute}
+                onCommunityRouteClear={() => setCommunityPendingRoute(null)}
+                onNavigateToCommunity={(tab) => {
+                  setCommunityPendingTab(tab);
+                  navigateTo("community");
+                }}
               />
             </>
           );
@@ -369,9 +384,13 @@ function App() {
             <CommunityHubPage
               apiClient={state.apiClient}
               authToken={state.authToken}
+              currentUserId={
+                state.currentUser?.id ?? state.currentUser?._id ?? ""
+              }
+              pendingTab={communityPendingTab}
+              onPendingTabConsumed={() => setCommunityPendingTab(null)}
               onViewRoute={(route) => {
-                state.setSelectedRoute(route);
-                state.setRoutesView("routeDetails");
+                setCommunityPendingRoute(route);
                 onNavigate("routes");
               }}
             />

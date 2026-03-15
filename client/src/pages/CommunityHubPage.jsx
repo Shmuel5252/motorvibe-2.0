@@ -16,6 +16,13 @@ import {
   Navigation,
   Zap,
   RefreshCw,
+  CalendarPlus,
+  X,
+  Map,
+  Bike,
+  CheckCircle2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
@@ -92,7 +99,7 @@ function ErrorMessage({ message, onRetry }) {
 function EmptyState({ message }) {
   return (
     <div className="flex flex-col items-center gap-2 py-16 text-center text-slate-500">
-      <span className="text-4xl">🏍️</span>
+      <Bike size={36} className="text-slate-600" />
       <p className="text-sm">{message}</p>
     </div>
   );
@@ -161,18 +168,62 @@ function RouteCard({ route, onViewRoute }) {
 
 /* ─── כרטיסיית אירוע רכיבה ─── */
 
-function EventCard({ event, authToken, apiClient, onJoined }) {
+function EventCard({
+  event,
+  authToken,
+  apiClient,
+  onJoined,
+  onDeleted,
+  currentUserId,
+}) {
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState(null);
+  const [joinSuccess, setJoinSuccess] = useState(false);
   const [participantCount, setParticipantCount] = useState(
     event.participants?.length ?? 0,
   );
+
+  /* ── edit state ── */
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editTitle, setEditTitle] = useState(event.title);
+  const [editDate, setEditDate] = useState(() => {
+    const d = new Date(event.scheduledAt);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [editDesc, setEditDesc] = useState(event.description ?? "");
+  const [editMax, setEditMax] = useState(event.maxParticipants ?? "");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  /* ── delete state ── */
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const organizerId = String(event.organizer?._id ?? event.organizer ?? "");
+  const isOrganizer = !!currentUserId && organizerId === String(currentUserId);
 
   const isFull =
     event.maxParticipants !== null &&
     event.maxParticipants !== undefined &&
     participantCount >= event.maxParticipants;
   const isOpen = event.status === "open";
+
+  const remaining =
+    event.maxParticipants != null
+      ? Math.max(0, event.maxParticipants - participantCount)
+      : null;
+
+  const remainingColor =
+    remaining === null
+      ? ""
+      : remaining === 0
+        ? "text-red-400 border-red-400/30 bg-red-400/10"
+        : remaining <= 3
+          ? "text-amber-400 border-amber-400/30 bg-amber-400/10"
+          : "text-emerald-400 border-emerald-400/30 bg-emerald-400/10";
 
   const scheduledDate = new Date(event.scheduledAt);
   const dateStr = scheduledDate.toLocaleDateString("he-IL", {
@@ -209,7 +260,8 @@ function EventCard({ event, authToken, apiClient, onJoined }) {
         {},
         { headers: { Authorization: `Bearer ${authToken}` } },
       );
-      setParticipantCount(data.participantCount);
+      setParticipantCount(data.participantCount ?? participantCount + 1);
+      setJoinSuccess(true);
       onJoined?.();
     } catch (err) {
       const code = err?.response?.data?.error?.code;
@@ -224,76 +276,298 @@ function EventCard({ event, authToken, apiClient, onJoined }) {
     }
   };
 
+  const handleEdit = async () => {
+    if (!editTitle.trim()) {
+      setEditError("כתוב שם לרכיבה");
+      return;
+    }
+    if (!editDate) {
+      setEditError("בחר תאריך ושעה");
+      return;
+    }
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      await apiClient.patch(
+        `/events/${event._id}`,
+        {
+          title: editTitle.trim(),
+          scheduledAt: new Date(editDate).toISOString(),
+          description: editDesc.trim() || "",
+          maxParticipants: editMax !== "" ? Number(editMax) : null,
+        },
+        { headers: { Authorization: `Bearer ${authToken}` } },
+      );
+      setEditSuccess(true);
+      setTimeout(() => {
+        setShowEditForm(false);
+        setEditSuccess(false);
+        onJoined?.();
+      }, 1000);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error?.message ??
+        err?.response?.data?.error?.details?.[0]?.msg;
+      setEditError(msg || "שגיאה בעדכון");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await apiClient.delete(`/events/${event._id}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      onDeleted?.();
+    } catch (err) {
+      setDeleteError(err?.response?.data?.error?.message || "שגיאה במחיקה");
+      setDeleteLoading(false);
+      setDeleteConfirm(false);
+    }
+  };
+
   return (
     <GlassCard className="flex flex-col gap-3">
-      {/* כותרת + סטטוס */}
+      {/* כותרת + כפתורי מארגן + סטטוס */}
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold leading-snug text-slate-100">
           {event.title}
         </h3>
-        <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${statusStyle}`}
-        >
-          {statusLabel}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isOrganizer && !showEditForm && (
+            <>
+              <button
+                type="button"
+                title="ערוך"
+                onClick={() => {
+                  setShowEditForm(true);
+                  setDeleteConfirm(false);
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:text-teal-300 hover:border-teal-400/30 transition"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                type="button"
+                title="מחק"
+                onClick={() => {
+                  setDeleteConfirm(true);
+                  setDeleteError(null);
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:text-red-400 hover:border-red-400/30 transition"
+              >
+                <Trash2 size={13} />
+              </button>
+            </>
+          )}
+          <span
+            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusStyle}`}
+          >
+            {statusLabel}
+          </span>
+        </div>
       </div>
 
-      {/* פרטי אירוע */}
-      <div className="flex flex-col gap-1.5 text-sm text-slate-400">
-        <span className="flex items-center gap-2">
-          <Calendar size={14} className="shrink-0" />
-          {dateStr} · {timeStr}
-        </span>
-        <span className="flex items-center gap-2">
-          <Users size={14} className="shrink-0" />
-          {participantCount} משתתפים
-          {event.maxParticipants ? ` / ${event.maxParticipants} מקסימום` : ""}
-        </span>
-        {event.organizer?.name && (
-          <span className="text-xs text-slate-500">
-            מארגן: {event.organizer.name}
-          </span>
-        )}
-        {event.route?.title && (
-          <span className="flex items-center gap-2 text-xs">
-            <MapPin size={12} className="shrink-0 text-teal-400" />
-            מסלול: {event.route.title}
-            {event.route.distanceKm != null && (
-              <span className="text-slate-500">
-                ({event.route.distanceKm.toFixed(1)} ק&quot;מ)
+      {/* תצוגת פרטים רגילה */}
+      {!showEditForm && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5 text-sm text-slate-400">
+            <span className="flex items-center gap-2">
+              <Calendar size={14} className="shrink-0" />
+              {dateStr} · {timeStr}
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-2">
+                <Users size={14} className="shrink-0" />
+                {participantCount} משתתפים
+                {event.maxParticipants ? ` / ${event.maxParticipants}` : ""}
+              </span>
+              {remaining !== null && (
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${remainingColor}`}
+                >
+                  {remaining === 0 ? "מלא" : `נותרו ${remaining} מקומות`}
+                </span>
+              )}
+            </div>
+            {event.organizer?.name && (
+              <span className="text-xs text-slate-500">
+                מארגן: {event.organizer.name}
               </span>
             )}
-          </span>
-        )}
-      </div>
+            {event.route?.title && (
+              <span className="flex items-center gap-2 text-xs">
+                <MapPin size={12} className="shrink-0 text-teal-400" />
+                מסלול: {event.route.title}
+                {event.route.distanceKm != null && (
+                  <span className="text-slate-500">
+                    ({event.route.distanceKm.toFixed(1)} ק&quot;מ)
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
 
-      {event.description && (
-        <p className="text-xs leading-relaxed text-slate-500">
-          {event.description}
-        </p>
+          {event.description && (
+            <p className="text-xs leading-relaxed text-slate-500">
+              {event.description}
+            </p>
+          )}
+
+          {/* אישור מחיקה */}
+          {deleteConfirm && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 space-y-2">
+              <p className="text-xs font-medium text-red-300">
+                למחוק את הרכיבה לצמיתות?
+              </p>
+              {deleteError && (
+                <p className="text-xs text-red-400">{deleteError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  className="flex-1 rounded-lg bg-red-600/80 py-1.5 text-xs font-bold text-white hover:bg-red-600 active:scale-95 transition disabled:opacity-50"
+                >
+                  {deleteLoading ? "מוחק..." : "כן, מחק"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirm(false);
+                    setDeleteError(null);
+                  }}
+                  className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          )}
+
+          {joinSuccess && (
+            <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
+              נתראה ברכיבה!
+            </p>
+          )}
+
+          {joinError && (
+            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+              {joinError}
+            </p>
+          )}
+
+          {!isOrganizer && (
+            <Button
+              variant={!isOpen || isFull ? "ghost" : "primary"}
+              size="md"
+              className="mt-auto w-full"
+              disabled={isJoining || isFull || !isOpen}
+              onClick={handleJoin}
+            >
+              {isJoining
+                ? "מצטרף..."
+                : isFull
+                  ? "האירוע מלא"
+                  : !isOpen
+                    ? "סגור להצטרפות"
+                    : "הצטרף לרכיבה"}
+            </Button>
+          )}
+        </div>
       )}
 
-      {joinError && (
-        <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
-          {joinError}
-        </p>
+      {/* טופס עריכה */}
+      {showEditForm && (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+              שם הרכיבה *
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              maxLength={100}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+              תאריך ושעה *
+            </label>
+            <input
+              type="datetime-local"
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 scheme-dark"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+              תיאור / נקודת מפגש
+            </label>
+            <textarea
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+              maxLength={400}
+              rows={2}
+              className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+              מקסימום משתתפים{" "}
+              <span className="text-slate-600 normal-case font-normal">
+                (ריק = ללא הגבלה)
+              </span>
+            </label>
+            <input
+              type="number"
+              value={editMax}
+              onChange={(e) => setEditMax(e.target.value)}
+              placeholder="ללא הגבלה"
+              min={2}
+              max={200}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+            />
+          </div>
+          {editError && (
+            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+              {editError}
+            </p>
+          )}
+          {editSuccess && (
+            <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-300">
+              עודכן בהצלחה!
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleEdit}
+              disabled={editLoading}
+              className="flex-1 rounded-xl bg-teal-600 py-2.5 text-sm font-bold text-white hover:bg-teal-500 active:scale-95 transition disabled:opacity-50"
+            >
+              {editLoading ? "שומר..." : "שמור שינויים"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditForm(false);
+                setEditError(null);
+              }}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-slate-400 hover:text-slate-200 transition"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
       )}
-
-      <Button
-        variant={!isOpen || isFull ? "ghost" : "primary"}
-        size="md"
-        className="mt-auto w-full"
-        disabled={isJoining || isFull || !isOpen}
-        onClick={handleJoin}
-      >
-        {isJoining
-          ? "מצטרף..."
-          : isFull
-            ? "האירוע מלא"
-            : !isOpen
-              ? "סגור להצטרפות"
-              : "הצטרף לרכיבה"}
-      </Button>
     </GlassCard>
   );
 }
@@ -304,8 +578,19 @@ export default function CommunityHubPage({
   apiClient,
   authToken,
   onViewRoute,
+  currentUserId = "",
+  pendingTab = null,
+  onPendingTabConsumed,
 }) {
   const [activeTab, setActiveTab] = useState("routes");
+
+  /* jump to requested tab (e.g. after creating a group ride) */
+  useEffect(() => {
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      onPendingTabConsumed?.();
+    }
+  }, [pendingTab]);
 
   /* ── Routes state ── */
   const [routes, setRoutes] = useState([]);
@@ -322,6 +607,74 @@ export default function CommunityHubPage({
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
 
+  /* ── Create event form state ── */
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDate, setNewEventDate] = useState("");
+  const [newEventMeeting, setNewEventMeeting] = useState("");
+  const [newEventDesc, setNewEventDesc] = useState("");
+  const [newEventMax, setNewEventMax] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [createSuccess, setCreateSuccess] = useState(false);
+
+  const resetCreateForm = () => {
+    setNewEventTitle("");
+    setNewEventDate("");
+    setNewEventMeeting("");
+    setNewEventDesc("");
+    setNewEventMax("");
+    setCreateError(null);
+    setCreateSuccess(false);
+  };
+
+  const handleCreateEvent = async () => {
+    if (!authToken) {
+      setCreateError("עליך להתחבר כדי ליצור רכיבה קבוצתית");
+      return;
+    }
+    if (!newEventTitle.trim()) {
+      setCreateError("כתוב שם לרכיבה");
+      return;
+    }
+    if (!newEventDate) {
+      setCreateError("בחר תאריך ושעה");
+      return;
+    }
+    setCreateLoading(true);
+    setCreateError(null);
+    const descParts = [];
+    if (newEventMeeting.trim())
+      descParts.push(`נקודת מפגש: ${newEventMeeting.trim()}`);
+    if (newEventDesc.trim()) descParts.push(newEventDesc.trim());
+    try {
+      await apiClient.post(
+        "/events",
+        {
+          title: newEventTitle.trim(),
+          scheduledAt: new Date(newEventDate).toISOString(),
+          description: descParts.join("\n") || undefined,
+          maxParticipants: newEventMax ? Number(newEventMax) : undefined,
+        },
+        { headers: { Authorization: `Bearer ${authToken}` } },
+      );
+      setCreateSuccess(true);
+      resetCreateForm();
+      await fetchEvents();
+      setTimeout(() => {
+        setShowCreateForm(false);
+        setCreateSuccess(false);
+      }, 1500);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error?.message ??
+        err?.response?.data?.error?.details?.[0]?.msg;
+      setCreateError(msg || "שגיאה ביצירת הרכיבה");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   /* ── fetch מסלולים ציבוריים ── */
   const fetchRoutes = useCallback(async () => {
     setRoutesLoading(true);
@@ -334,8 +687,17 @@ export default function CommunityHubPage({
 
       const { data } = await apiClient.get("/routes/public", { params });
       setRoutes(data.routes ?? []);
-    } catch {
-      setRoutesError("שגיאה בטעינת המסלולים");
+    } catch (err) {
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.error?.message;
+      console.error("[fetchRoutes]", err);
+      setRoutesError(
+        serverMsg
+          ? `שגיאה ${status}: ${serverMsg}`
+          : status
+            ? `שגיאת שרת (HTTP ${status})`
+            : "לא ניתן להתחבר לשרת — בדוק שהשרת רץ",
+      );
     } finally {
       setRoutesLoading(false);
     }
@@ -348,8 +710,17 @@ export default function CommunityHubPage({
     try {
       const { data } = await apiClient.get("/events");
       setEvents(data.events ?? []);
-    } catch {
-      setEventsError("שגיאה בטעינת האירועים");
+    } catch (err) {
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.error?.message;
+      console.error("[fetchEvents]", err);
+      setEventsError(
+        serverMsg
+          ? `שגיאה ${status}: ${serverMsg}`
+          : status
+            ? `שגיאת שרת (HTTP ${status})`
+            : "לא ניתן להתחבר לשרת — בדוק שהשרת רץ",
+      );
     } finally {
       setEventsLoading(false);
     }
@@ -382,13 +753,13 @@ export default function CommunityHubPage({
           active={activeTab === "routes"}
           onClick={() => setActiveTab("routes")}
         >
-          🗺 מסלולי הקהילה
+          מסלולי הקהילה
         </TabButton>
         <TabButton
           active={activeTab === "events"}
           onClick={() => setActiveTab("events")}
         >
-          🏍️ רכיבות קבוצתיות
+          רכיבות קבוצתיות
         </TabButton>
       </div>
 
@@ -454,12 +825,149 @@ export default function CommunityHubPage({
       {/* ─── טאב רכיבות קבוצתיות ─── */}
       {activeTab === "events" && (
         <>
+          {/* כפתור יצירת רכיבה — מוצג תמיד בטאב events */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateForm((v) => !v);
+              setCreateError(null);
+            }}
+            className="w-full mb-4 flex items-center justify-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 py-3 text-sm font-bold text-violet-300 hover:bg-violet-500/20 transition active:scale-95"
+          >
+            <CalendarPlus size={16} />
+            {showCreateForm ? "סגור טופס" : "צור רכיבה קבוצתית"}
+          </button>
+
+          {/* טופס יצירה */}
+          {showCreateForm && (
+            <div className="mb-5 rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3 backdrop-blur-sm">
+              <p className="text-sm font-bold text-violet-300 flex items-center gap-2">
+                <CalendarPlus size={15} /> פרטי הרכיבה
+              </p>
+
+              {/* שם */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  שם הרכיבה *
+                </label>
+                <input
+                  type="text"
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  placeholder="לדוגמה: רכיבת שבת לצפון"
+                  maxLength={100}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                />
+              </div>
+
+              {/* תאריך */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  תאריך ושעה *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50 scheme-dark"
+                />
+              </div>
+
+              {/* נקודת מפגש */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  נקודת מפגש
+                </label>
+                <input
+                  type="text"
+                  value={newEventMeeting}
+                  onChange={(e) => setNewEventMeeting(e.target.value)}
+                  placeholder="לדוגמה: חניון כיכר רבין"
+                  maxLength={120}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                />
+              </div>
+
+              {/* תיאור */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  תיאור קצר
+                </label>
+                <textarea
+                  value={newEventDesc}
+                  onChange={(e) => setNewEventDesc(e.target.value)}
+                  placeholder="לדוגמה: רכיבה רגועה, עוצרים לקפה בסוף"
+                  maxLength={300}
+                  rows={2}
+                  className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                />
+              </div>
+
+              {/* מקסימום משתתפים */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  מקסימום משתתפים{" "}
+                  <span className="text-slate-600 normal-case font-normal">
+                    (אופציונלי)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={newEventMax}
+                  onChange={(e) => setNewEventMax(e.target.value)}
+                  placeholder="ללא הגבלה"
+                  min={2}
+                  max={200}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                />
+              </div>
+
+              {createError && (
+                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+                  {createError}
+                </p>
+              )}
+              {createSuccess && (
+                <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-300">
+                  הרכיבה נוצרה בהצלחה!
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleCreateEvent}
+                disabled={createLoading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-500 active:scale-95 transition disabled:opacity-50"
+              >
+                {createLoading ? (
+                  "שולח..."
+                ) : (
+                  <>
+                    <CalendarPlus size={15} /> שלח הזמנה לקהילה
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           {eventsLoading && <LoadingSpinner />}
           {eventsError && (
             <ErrorMessage message={eventsError} onRetry={fetchEvents} />
           )}
           {!eventsLoading && !eventsError && events.length === 0 && (
-            <EmptyState message="אין רכיבות קבוצתיות מתוכננות כרגע" />
+            <div className="flex flex-col items-center gap-4 py-16 text-center">
+              <div className="flex items-center justify-center rounded-full border border-white/10 bg-white/5 p-5">
+                <Bike size={36} className="text-slate-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-300">
+                  עדיין אין רכיבות מתוכננות
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  היה הראשון ליזום רכיבה!
+                </p>
+              </div>
+            </div>
           )}
           <div className="flex flex-col gap-4">
             {events.map((event) => (
@@ -468,7 +976,9 @@ export default function CommunityHubPage({
                 event={event}
                 authToken={authToken}
                 apiClient={apiClient}
+                currentUserId={currentUserId}
                 onJoined={fetchEvents}
+                onDeleted={fetchEvents}
               />
             ))}
           </div>

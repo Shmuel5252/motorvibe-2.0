@@ -115,12 +115,10 @@ async function joinEvent(req, res) {
   event.participants.push(userId);
   await event.save();
 
-  return res
-    .status(200)
-    .json({
-      message: "Joined successfully",
-      participantCount: event.participants.length,
-    });
+  return res.status(200).json({
+    message: "Joined successfully",
+    participantCount: event.participants.length,
+  });
 }
 
 /** DELETE /api/events/:id/leave — leave a ride event (auth required) */
@@ -157,12 +155,10 @@ async function leaveEvent(req, res) {
 
   await event.save();
 
-  return res
-    .status(200)
-    .json({
-      message: "Left successfully",
-      participantCount: event.participants.length,
-    });
+  return res.status(200).json({
+    message: "Left successfully",
+    participantCount: event.participants.length,
+  });
 }
 
 /** PATCH /api/events/:id/cancel — cancel an event (organizer only) */
@@ -196,6 +192,60 @@ async function cancelEvent(req, res) {
   return res.status(200).json({ event });
 }
 
+/** PATCH /api/events/:id — update event details (organizer only) */
+async function updateEvent(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return sendValidation(res, errors);
+
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) return notFound(res);
+
+  const event = await RideEvent.findById(id);
+  if (!event) return notFound(res);
+
+  const userId = new mongoose.Types.ObjectId(req.user.userId);
+  if (!event.organizer.equals(userId)) {
+    return res.status(403).json({
+      error: {
+        code: "FORBIDDEN",
+        message: "Only the organizer can edit this event",
+      },
+    });
+  }
+
+  const { title, description, scheduledAt, maxParticipants } = req.body;
+  if (title != null) event.title = title;
+  if (description != null) event.description = description;
+  if (scheduledAt != null) event.scheduledAt = scheduledAt;
+  if ("maxParticipants" in req.body)
+    event.maxParticipants = maxParticipants ?? null;
+
+  await event.save();
+  return res.status(200).json({ event });
+}
+
+/** DELETE /api/events/:id — permanently delete event (organizer only) */
+async function deleteEvent(req, res) {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) return notFound(res);
+
+  const event = await RideEvent.findById(id);
+  if (!event) return notFound(res);
+
+  const userId = new mongoose.Types.ObjectId(req.user.userId);
+  if (!event.organizer.equals(userId)) {
+    return res.status(403).json({
+      error: {
+        code: "FORBIDDEN",
+        message: "Only the organizer can delete this event",
+      },
+    });
+  }
+
+  await event.deleteOne();
+  return res.status(200).json({ message: "Event deleted" });
+}
+
 module.exports = {
   createEvent,
   listEvents,
@@ -203,4 +253,6 @@ module.exports = {
   joinEvent,
   leaveEvent,
   cancelEvent,
+  updateEvent,
+  deleteEvent,
 };

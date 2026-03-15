@@ -108,6 +108,7 @@ async function updateMyRoute(req, res) {
     "routeType",
     "difficulty",
     "isTwisty",
+    "visibility",
   ];
   for (const key of fields) {
     if (req.body[key] !== undefined) update[key] = req.body[key];
@@ -175,19 +176,30 @@ async function deleteMyRoute(req, res) {
 }
 
 async function listPublicRoutes(req, res) {
-  const { routeType, difficulty, isTwisty } = req.query;
+  try {
+    const { routeType, difficulty, isTwisty } = req.query;
 
-  const filter = { visibility: "public" };
-  if (routeType) filter.routeType = routeType;
-  if (difficulty) filter.difficulty = difficulty;
-  if (isTwisty !== undefined) filter.isTwisty = isTwisty === "true";
+    const filter = { visibility: "public" };
+    if (routeType) filter.routeType = routeType;
+    if (difficulty) filter.difficulty = difficulty;
+    // only filter by isTwisty when explicitly set to "true"
+    if (isTwisty === "true") filter.isTwisty = true;
 
-  const routes = await Route.find(filter)
-    .select("-polyline") // polyline can be large; omit from list view
-    .sort({ createdAt: -1 })
-    .limit(100);
+    const routes = await Route.find(filter)
+      .select("-polyline") // polyline can be large; omit from list view
+      .sort({ createdAt: -1 })
+      .limit(100);
 
-  return res.status(200).json({ routes });
+    return res.status(200).json({ routes });
+  } catch (err) {
+    console.error("[listPublicRoutes]", err);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to load public routes",
+      },
+    });
+  }
 }
 
 module.exports = {

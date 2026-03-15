@@ -13,7 +13,42 @@ import {
 } from "@react-google-maps/api";
 import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
-import { ISRAEL_DEFAULT_CENTER, ISRAEL_DEFAULT_ZOOM } from "../app/state/useAppState";
+import {
+  ISRAEL_DEFAULT_CENTER,
+  ISRAEL_DEFAULT_ZOOM,
+} from "../app/state/useAppState";
+
+const DARK_MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#0f172a" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0f172a" }] },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#1e293b" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#0f172a" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#020617" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#1e293b" }],
+  },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  {
+    featureType: "administrative",
+    elementType: "geometry",
+    stylers: [{ color: "#1e293b" }],
+  },
+];
 
 /* ─── ActiveRideBanner ─── */
 
@@ -57,8 +92,12 @@ function RouteDetailsMap({
 
   /* בטיחות Polyline: אם הנתיב לא תקין, לא מציירים קו. */
   const safePath = getSafePolylinePath(path);
-  const selectedOrigin = isValidMapPoint(preferredOrigin) ? preferredOrigin : null;
-  const selectedDestination = isValidMapPoint(preferredDestination) ? preferredDestination : null;
+  const selectedOrigin = isValidMapPoint(preferredOrigin)
+    ? preferredOrigin
+    : null;
+  const selectedDestination = isValidMapPoint(preferredDestination)
+    ? preferredDestination
+    : null;
 
   /* דיבוג Directions: בקשת מסלול אמיתי בין נקודות התחלה/סיום. */
   useEffect(() => {
@@ -84,7 +123,11 @@ function RouteDetailsMap({
     const travelMode = window.google.maps.TravelMode.DRIVING;
 
     const request = { origin, destination, travelMode };
-    console.log("Directions request", { origin, destination, travelMode: "DRIVING" });
+    console.log("Directions request", {
+      origin,
+      destination,
+      travelMode: "DRIVING",
+    });
 
     try {
       const service = new window.google.maps.DirectionsService();
@@ -101,7 +144,9 @@ function RouteDetailsMap({
         setDirectionsResult(null);
         setDirectionsStatus(String(status ?? "UNKNOWN_ERROR"));
         setDirectionsErrorMessage(
-          result?.error_message || result?.status_message || "לא התקבלה תגובה תקינה",
+          result?.error_message ||
+            result?.status_message ||
+            "לא התקבלה תגובה תקינה",
         );
       });
     } catch {
@@ -109,7 +154,13 @@ function RouteDetailsMap({
       setDirectionsStatus("EXCEPTION");
       setDirectionsErrorMessage("שגיאה פנימית בהפעלת Directions");
     }
-  }, [normalizedApiKey, isMapLoaded, mapInstance, selectedOrigin, selectedDestination]);
+  }, [
+    normalizedApiKey,
+    isMapLoaded,
+    mapInstance,
+    selectedOrigin,
+    selectedDestination,
+  ]);
 
   /* התאמת viewport לנקודות ידועות באופן בטוח בלבד. */
   useEffect(() => {
@@ -171,13 +222,14 @@ function RouteDetailsMap({
 
   return (
     <div className="w-full">
-      <div className="relative h-70 w-full md:h-90">
+      <div className="relative h-50 w-full">
         <GoogleMap
           center={ISRAEL_DEFAULT_CENTER}
           zoom={ISRAEL_DEFAULT_ZOOM}
           onLoad={(map) => setMapInstance(map)}
           mapContainerClassName="h-full w-full"
           options={{
+            styles: DARK_MAP_STYLE,
             disableDefaultUI: true,
             zoomControl: true,
             streetViewControl: false,
@@ -294,23 +346,39 @@ export default function RoutesPage({
   authToken,
   apiClient,
   /* new route form */
-  newRouteTitle, setNewRouteTitle,
-  newOriginLabel, setNewOriginLabel,
-  newOriginLatLng, setNewOriginLatLng,
-  newDestinationLabel, setNewDestinationLabel,
-  newDestinationLatLng, setNewDestinationLatLng,
-  newRouteType, setNewRouteType,
-  newRouteDifficulty, setNewRouteDifficulty,
-  newRouteIsTwisty, setNewRouteIsTwisty,
-  isAddRouteExpanded, setIsAddRouteExpanded,
-  activeMapPickField, setActiveMapPickField,
-  mapPickCenter, setMapPickCenter,
-  mapPickStatus, setMapPickStatus,
+  newRouteTitle,
+  setNewRouteTitle,
+  newOriginLabel,
+  setNewOriginLabel,
+  newOriginLatLng,
+  setNewOriginLatLng,
+  newDestinationLabel,
+  setNewDestinationLabel,
+  newDestinationLatLng,
+  setNewDestinationLatLng,
+  newRouteType,
+  setNewRouteType,
+  newRouteDifficulty,
+  setNewRouteDifficulty,
+  newRouteIsTwisty,
+  setNewRouteIsTwisty,
+  isAddRouteExpanded,
+  setIsAddRouteExpanded,
+  activeMapPickField,
+  setActiveMapPickField,
+  mapPickCenter,
+  setMapPickCenter,
+  mapPickStatus,
+  setMapPickStatus,
   mapPickRequestIdRef,
-  originSuggestions, setOriginSuggestions,
-  destinationSuggestions, setDestinationSuggestions,
-  activeSuggestionField, setActiveSuggestionField,
-  newRouteLocationError, setNewRouteLocationError,
+  originSuggestions,
+  setOriginSuggestions,
+  destinationSuggestions,
+  setDestinationSuggestions,
+  activeSuggestionField,
+  setActiveSuggestionField,
+  newRouteLocationError,
+  setNewRouteLocationError,
   isPlacesSuggestionsReady,
   handleUnauthorized,
 }) {
@@ -506,7 +574,7 @@ export default function RoutesPage({
 
   if (routesView === "routeDetails" && selectedRoute) {
     return (
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-10 pt-5 sm:px-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 pb-28 pt-4 sm:px-6">
         <main className="mt-6 flex-1">
           <ActiveRideBanner
             isRideActive={isRideActive}
@@ -550,10 +618,16 @@ export default function RoutesPage({
                 isMapLoaded={isMapLoaded}
                 mapLoadError={mapLoadError}
                 preferredOrigin={
-                  selectedRoute?.origin || selectedRoute?.fromLatLng || null
+                  selectedRoute?.start ||
+                  selectedRoute?.origin ||
+                  selectedRoute?.fromLatLng ||
+                  null
                 }
                 preferredDestination={
-                  selectedRoute?.destination || selectedRoute?.toLatLng || null
+                  selectedRoute?.end ||
+                  selectedRoute?.destination ||
+                  selectedRoute?.toLatLng ||
+                  null
                 }
                 isValidMapPoint={isValidMapPoint}
                 getSafePolylinePath={getSafePolylinePath}
@@ -571,7 +645,7 @@ export default function RoutesPage({
             </div>
             <div className="mv-card rounded-xl px-3 py-3 text-center">
               <p className="text-xl font-semibold leading-none text-white sm:text-2xl">
-                {selectedRoute.etaMin} דק׳
+                {selectedRoute.etaMinutes} דק׳
               </p>
               <p className="mt-1 text-xs text-slate-400">זמן משוער</p>
             </div>
@@ -624,7 +698,8 @@ export default function RoutesPage({
                 size="md"
                 className="border-rose-300/30 text-rose-300 hover:text-rose-200"
                 onClick={async () => {
-                  if (!window.confirm("האם אתה בטוח שברצונך למחוק מסלול זה?")) return;
+                  if (!window.confirm("האם אתה בטוח שברצונך למחוק מסלול זה?"))
+                    return;
                   setRouteDeleteError("");
                   const routeId = selectedRoute._id || selectedRoute.id;
                   try {
@@ -632,7 +707,11 @@ export default function RoutesPage({
                     await fetchRoutesFromServer(authToken);
                     goToRoutesListView();
                   } catch (err) {
-                    console.error("DELETE route error:", err?.response?.status, err?.message);
+                    console.error(
+                      "DELETE route error:",
+                      err?.response?.status,
+                      err?.message,
+                    );
                     setRouteDeleteError("שגיאה במחיקת מסלול");
                   }
                 }}
@@ -937,7 +1016,9 @@ export default function RoutesPage({
                             },
                             routeType: newRouteType,
                             difficulty: newRouteIsTwisty
-                              ? getAdjustedDifficultyForTwisty(newRouteDifficulty)
+                              ? getAdjustedDifficultyForTwisty(
+                                  newRouteDifficulty,
+                                )
                               : newRouteDifficulty,
                             isTwisty: newRouteIsTwisty,
                           },
@@ -1022,7 +1103,7 @@ export default function RoutesPage({
                           center={mapPickCenter}
                           zoom={11}
                           mapContainerStyle={{ width: "100%", height: "100%" }}
-                          onLoad={() => { }}
+                          onLoad={() => {}}
                           onClick={(event) => {
                             const lat = event.latLng?.lat();
                             const lng = event.latLng?.lng();
@@ -1051,10 +1132,7 @@ export default function RoutesPage({
                           }}
                         >
                           {newOriginLatLng && (
-                            <MarkerF
-                              position={newOriginLatLng}
-                              title="מוצא"
-                            />
+                            <MarkerF position={newOriginLatLng} title="מוצא" />
                           )}
                           {newDestinationLatLng && (
                             <MarkerF
@@ -1077,10 +1155,11 @@ export default function RoutesPage({
                       )}
                       {!!mapPickStatus && (
                         <span
-                          className={`mv-pill px-2.5 py-1 text-xs ${mapPickStatus === "מחפש מיקום..."
-                            ? "text-emerald-200"
-                            : "text-amber-200"
-                            }`}
+                          className={`mv-pill px-2.5 py-1 text-xs ${
+                            mapPickStatus === "מחפש מיקום..."
+                              ? "text-emerald-200"
+                              : "text-amber-200"
+                          }`}
                         >
                           {mapPickStatus}
                         </span>

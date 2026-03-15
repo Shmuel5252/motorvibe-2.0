@@ -11,6 +11,17 @@ router.get("/:id", eventsController.getEvent);
 // Protected endpoints
 router.use(authMiddleware);
 
+const eventBodyValidators = [
+  body("title").optional().isString().trim().isLength({ min: 2, max: 100 }),
+  body("description").optional().isString().trim().isLength({ max: 1000 }),
+  body("scheduledAt")
+    .optional()
+    .isISO8601()
+    .withMessage("scheduledAt must be a valid ISO-8601 date"),
+  body("maxParticipants").optional({ nullable: true }).isInt({ min: 2 }),
+  body("route").optional({ nullable: true }).isMongoId(),
+];
+
 router.post(
   "/",
   [
@@ -30,5 +41,9 @@ router.post("/:id/join", eventsController.joinEvent);
 router.delete("/:id/leave", eventsController.leaveEvent);
 
 router.patch("/:id/cancel", eventsController.cancelEvent);
+
+router.patch("/:id", eventBodyValidators, eventsController.updateEvent);
+
+router.delete("/:id", eventsController.deleteEvent);
 
 module.exports = router;

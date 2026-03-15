@@ -7,7 +7,9 @@ import Button from "../app/ui/components/Button";
 import GlassCard from "../app/ui/components/GlassCard";
 import { formatRideDuration } from "../app/utils/formatters";
 
-const IMG_BASE = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000";
+const IMG_BASE =
+  import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
+  "http://localhost:5000";
 function imgSrc(url) {
   if (!url) return null;
   return url.startsWith("http") ? url : `${IMG_BASE}${url}`;
@@ -76,7 +78,7 @@ export default function HomePage({
         <img
           src="/assets/motorcycle-hero.jpg"
           alt="רקע אופנוע"
-          className="absolute top-0 w-full object-cover opacity-60 h-[70vh] object-[center_bottom] sm:h-screen sm:object-[center_60%] [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)]"
+          className="absolute top-0 w-full object-cover opacity-60 h-[70vh] object-[center_bottom] sm:h-screen sm:object-[center_60%] mask-[linear-gradient(to_bottom,black_40%,transparent_100%)]"
           loading="eager"
         />
         {/* רדיאל ירוק/כחלחל שנותן אווירות 'Motovibe' למראה הסופי */}
@@ -148,7 +150,14 @@ export default function HomePage({
                       {route.from} → {route.to}
                     </p>
                     <p className="mt-1 text-xs text-gray-300">
-                      <span className="text-emerald-400 font-bold">{route.distanceKm}</span> ק״מ • <span className="text-emerald-400 font-bold">{route.etaMin}</span> דק׳
+                      <span className="text-emerald-400 font-bold">
+                        {route.distanceKm}
+                      </span>{" "}
+                      ק״מ •{" "}
+                      <span className="text-emerald-400 font-bold">
+                        {route.etaMin}
+                      </span>{" "}
+                      דק׳
                     </p>
                   </div>
                 ))}
@@ -156,9 +165,14 @@ export default function HomePage({
             )}
           </GlassCard>
 
-          <div onClick={() => onNavigate("bike")} className="cursor-pointer group">
+          <div
+            onClick={() => onNavigate("bike")}
+            className="cursor-pointer group"
+          >
             <GlassCard
-              title={bike ? (bike.name || bike.model || "האופנוע שלי") : "האופנוע שלי"}
+              title={
+                bike ? bike.name || bike.model || "האופנוע שלי" : "האופנוע שלי"
+              }
               right={
                 bike ? (
                   <span className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-lg px-2.5 py-1 text-xs font-bold text-emerald-400 group-hover:bg-white/10 transition-colors">
@@ -166,7 +180,7 @@ export default function HomePage({
                   </span>
                 ) : null
               }
-              className="group-hover:bg-white/[0.08] transition-all duration-300 h-full"
+              className="group-hover:bg-white/8 transition-all duration-300 h-full"
             >
               {bike ? (
                 <div className="space-y-3">
@@ -174,22 +188,36 @@ export default function HomePage({
                     <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[24px_24px]" />
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(20,184,166,0.18),transparent_55%)]" />
                     {imgSrc(bike.imageUrl) ? (
-                      <img src={imgSrc(bike.imageUrl)} alt="תמונת אופנוע" className="h-full w-full object-cover" />
+                      <img
+                        src={imgSrc(bike.imageUrl)}
+                        alt="תמונת אופנוע"
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-semibold text-slate-400">{bike.make || ""} {bike.model || "האופנוע שלי"}</span>
+                        <span className="text-xs font-semibold text-slate-400">
+                          {bike.make || ""} {bike.model || "האופנוע שלי"}
+                        </span>
                       </div>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-400">סה״כ ק״מ:</p>
-                    <p className="text-emerald-400 font-bold">{bike.currentOdometerKm != null ? bike.currentOdometerKm.toLocaleString("he-IL") : "--"}</p>
+                    <p className="text-emerald-400 font-bold">
+                      {bike.currentOdometerKm != null
+                        ? bike.currentOdometerKm.toLocaleString("he-IL")
+                        : "--"}
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center space-y-2 py-4">
-                  <p className="text-sm font-semibold text-slate-100">אין אופנוע שמור</p>
-                  <p className="text-xs text-slate-400">לחץ כאן כדי להוסיף את האופנוע שלך</p>
+                  <p className="text-sm font-semibold text-slate-100">
+                    אין אופנוע שמור
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    לחץ כאן כדי להוסיף את האופנוע שלך
+                  </p>
                 </div>
               )}
             </GlassCard>
@@ -200,17 +228,33 @@ export default function HomePage({
       {/* פס סטטיסטיקות תחתון */}
       {(() => {
         const totalRides = historyRides.length;
-        const totalKm = historyRides.reduce((sum, r) => sum + (r.rawKm || 0), 0);
-        const totalSeconds = historyRides.reduce((sum, r) => sum + (r.rawSeconds || 0), 0);
+        const totalKm = historyRides.reduce(
+          (sum, r) => sum + (r.rawKm || 0),
+          0,
+        );
+        const totalSeconds = historyRides.reduce(
+          (sum, r) => sum + (r.rawSeconds || 0),
+          0,
+        );
 
         return (
           <section className="bg-white/5 backdrop-blur-md border border-white/10 rounded-full shadow-lg mx-4 mt-6 px-4 py-3 sm:mx-6">
             <div className="flex items-center justify-between gap-2 text-sm text-gray-400">
-              <span><span className="text-emerald-400 font-bold">{totalRides}</span> רכיבות</span>
+              <span>
+                <span className="text-emerald-400 font-bold">{totalRides}</span>{" "}
+                רכיבות
+              </span>
               <span className="text-white/20">|</span>
-              <span className="text-emerald-400 font-bold">{totalSeconds != null ? formatRideDuration(totalSeconds) : "--"}</span>
+              <span className="text-emerald-400 font-bold">
+                {totalSeconds != null ? formatRideDuration(totalSeconds) : "--"}
+              </span>
               <span className="text-white/20">|</span>
-              <span><span className="text-emerald-400 font-bold">{totalKm != null ? parseFloat(totalKm.toFixed(1)) : "--"}</span> ק״מ</span>
+              <span>
+                <span className="text-emerald-400 font-bold">
+                  {totalKm != null ? parseFloat(totalKm.toFixed(1)) : "--"}
+                </span>{" "}
+                ק״מ
+              </span>
             </div>
           </section>
         );
